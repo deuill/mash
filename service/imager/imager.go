@@ -22,14 +22,14 @@ type Imager struct {
 	Sources map[string]*Source // A map of sources, indexed under their name.
 }
 
-func (i *Imager) Call(method string, r *http.Request, w http.ResponseWriter) (interface{}, error) {
+func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, error) {
 	// Split request to its significant parts.
-	fields := strings.SplitN(r.URL.Path, "/", 4)
-	if len(fields) < 4 || fields[3] == "" {
+	fields := strings.SplitN(r.URL.Path, "/", 5)
+	if len(fields) < 5 || fields[4] == "" {
 		return nil, fmt.Errorf("image URL is unset or empty")
 	}
 
-	data, _ := fields[2], fields[3]
+	data, path := fields[3], fields[4]
 
 	// Unpack request parameters and prepare a pipeline for subsequent operations.
 	params, err := base64.StdEncoding.DecodeString(data)
@@ -37,12 +37,15 @@ func (i *Imager) Call(method string, r *http.Request, w http.ResponseWriter) (in
 		return nil, fmt.Errorf("failed to decode base64-encoded parameters")
 	}
 
-	pline := NewPipeline()
+	pline, err := NewPipeline()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize pipeline: %s", err)
+	}
 
 	for _, p := range strings.Split(string(params), ",") {
 		t := strings.Split(p, "=")
 		if len(t) != 2 {
-			return nil, fmt.Errorf("request parameter is malformed: '%s'", p)
+			return nil, fmt.Errorf("request parameter for pipeline is malformed: '%s'", p)
 		}
 
 		key, value := t[0], strings.TrimSpace(t[1])
@@ -51,26 +54,45 @@ func (i *Imager) Call(method string, r *http.Request, w http.ResponseWriter) (in
 		}
 	}
 
-	return pline, nil
+	// Fetch original image from remote server.
+	// FIXME: Allow for sources other than default.
+	file, err := i.Sources["default"].GetFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("%#v\n", pline)
+	w.Write(file)
+
+	return nil, nil
 }
 
 func (i *Imager) Start() error {
+	// Register handler methods under their names.
+	service.RegisterHandler("imager", "process", i.Process)
+
+	// Load Imager configuration file and initialize sources.
 	dict, err := ini.Load(*i.Config)
 	if err != nil {
 		return err
 	}
 
-	for _, name := range dict.GetSections() {
-		bucket, _ := dict.GetString(name, "s3_bucket")
-		access, _ := dict.GetString(name, "s3_access_key")
-		secret, _ := dict.GetString(name, "s3_secret_key")
+	for _, sect := range dict.GetSections() {
+		region, _ := dict.GetString(sect, "s3_region")
+		bucket, _ := dict.GetString(sect, "s3_bucket")
+		access, _ := dict.GetString(sect, "s3_access_key")
+		secret, _ := dict.GetString(sect, "s3_secret_key")
 
-		i.Sources[name] = NewSource(bucket, access, secret)
-	}
+		s, err := NewSource(region, bucket, access, secret)
+		if err != nil {
+			return err
+		}
 
-	// A default source should always be set.
-	if _, exists := i.Sources["default"]; !exists {
-		return fmt.Errorf("no default source found in config")
+		if sect == "" {
+			i.Sources["default"] = s
+		} else {
+			i.Sources[sect] = s
+		}
 	}
 
 	return nil

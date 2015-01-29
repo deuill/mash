@@ -10,23 +10,25 @@ import (
 // A Pipeline represents all data required for converting an image from its original format to the
 // desired result.
 type Pipeline struct {
-	Width   int64   `defalt:"0"`
+	Width   int64   `default:"0"`
 	Height  int64   `default:"0"`
 	Density float64 `default:"1"`
 	Quality int64   `default:"75"`
 }
 
-func NewPipeline() *Pipeline {
+func NewPipeline() (*Pipeline, error) {
 	p := &Pipeline{}
 	pt := reflect.ValueOf(p).Elem().Type()
 
 	// Set default values from field tags.
 	for i := 0; i < pt.NumField(); i++ {
 		f := pt.Field(i)
-		p.SetString(f.Name, f.Tag.Get("default"))
+		if err := p.SetString(f.Name, f.Tag.Get("default")); err != nil {
+			return nil, err
+		}
 	}
 
-	return p
+	return p, nil
 }
 
 func (p *Pipeline) SetString(field, value string) error {
