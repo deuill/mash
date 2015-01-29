@@ -1,0 +1,12 @@
+[Unit]
+Description=Alfred task runner
+
+[Service]
+User=http
+Group=http
+
+PIDFile=/var/run/alfred/alfred.pid
+ExecStart=/usr/bin/alfred
+
+[Install]
+WantedBy=multi-user.target

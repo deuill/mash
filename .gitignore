@@ -1,0 +1,4 @@
+# Ignored files and folders
+.tmp
+.attic
+services.go

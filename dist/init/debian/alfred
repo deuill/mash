@@ -1,0 +1,77 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          alfred
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: starts the alfred task runner
+# Description:       starts alfred using start-stop-daemon
+### END INIT INFO
+
+NAME=alfred
+DESC="Alfred task runner"
+
+USER=www-data
+DAEMON=/usr/bin/$NAME
+PID_FILE=/var/run/$NAME/$NAME.pid
+
+test -x $DAEMON || exit 0
+
+set -e
+
+. /lib/lsb/init-functions
+
+start() {
+	if [ `id -u` -ne 0 ]
+	then
+		echo "This script must be run as root, aborting..."
+		exit 1
+	fi
+
+	echo -n "Starting $DESC: "
+	mkdir -p /var/run/$NAME
+	chown -R $USER:$USER /var/run/$NAME
+	start-stop-daemon --start --background --quiet \
+					  --make-pidfile --pidfile $PID_FILE \
+					  --exec $DAEMON -- "$OPTS > /var/log/$NAME.log 2>&1" || true
+	echo "$NAME."
+}
+
+stop() {
+	if [ `id -u` -ne 0 ]
+	then
+		echo "This script must be run as root, aborting..."
+		exit 1
+	fi
+
+	echo -n "Stopping $DESC: "
+	start-stop-daemon --stop --quiet --pidfile $PID_FILE --exec $DAEMON || true
+	rm -Rf /var/run/sleepy
+	echo "$NAME."
+}
+
+case "$1" in
+	start)
+		start
+		;;
+
+	stop)
+		stop
+		;;
+
+	restart)
+		$0 stop
+		sleep 1
+		$0 start
+		;;
+
+	status)
+		status_of_proc -p $PID_FILE "$DAEMON" $NAME && exit 0 || exit $?
+		;;
+
+	*)
+		echo "Usage: $0 {start|stop|restart|status}"
+		exit 1
+		;;
+esac
