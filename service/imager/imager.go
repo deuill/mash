@@ -63,7 +63,6 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		return nil, err
 	}
 
-	fmt.Printf("%#v\n", pline)
 	w.Write(file)
 
 	return nil, nil

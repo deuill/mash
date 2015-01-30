@@ -94,16 +94,18 @@ func (f *FileCache) Add(key string, value interface{}) {
 
 	f.cache[key] = el
 	f.usage += el.Value.(*file).size
+	el.Value.(*file).fp.Seek(0, 0)
 }
 
 func (f *FileCache) Get(key string) interface{} {
 	if el, exists := f.cache[key]; exists {
 		f.order.MoveToFront(el)
 
-		data := make([]byte, el.Value.(*file).size)
-		el.Value.(*file).fp.Read(data)
+		buf := make([]byte, el.Value.(*file).size)
+		el.Value.(*file).fp.Read(buf)
+		el.Value.(*file).fp.Seek(0, 0)
 
-		return data
+		return buf
 	}
 
 	return nil
