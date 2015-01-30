@@ -22,21 +22,29 @@ type file struct {
 	key  string
 }
 
-func NewFileCache(path string, quota int64) (*FileCache, error) {
-	// Create cache directory if it does not exist.
-	fi, _ := os.Stat(path)
-	if !fi.IsDir() {
-		if err := os.MkdirAll(path, 0755); err != nil {
+func NewFileCache(path string, size int64) (*FileCache, error) {
+	// If directory structure already exists, remove it first.
+	if fi, err := os.Stat(path); err != nil && !os.IsNotExist(err) {
+		return nil, err
+	} else if fi != nil && fi.IsDir() {
+		if err = os.RemoveAll(path); err != nil {
 			return nil, err
 		}
 	}
 
-	return &FileCache{
+	// Create directory structure for cached files.
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return nil, err
+	}
+
+	f := &FileCache{
 		path:  path,
-		quota: quota,
+		quota: size,
 		order: list.New(),
 		cache: make(map[string]*list.Element),
-	}, nil
+	}
+
+	return f, nil
 }
 
 func (f *FileCache) Add(key string, value interface{}) {
@@ -54,7 +62,12 @@ func (f *FileCache) Add(key string, value interface{}) {
 		f.order.MoveToFront(el)
 		return
 	} else {
-		fp, err := os.Create(path.Join(f.path, key))
+		p := path.Join(f.path, key)
+		if err := os.MkdirAll(path.Dir(p), 0755); err != nil {
+			return
+		}
+
+		fp, err := os.Create(p)
 		if err != nil {
 			return
 		}
@@ -68,10 +81,8 @@ func (f *FileCache) Add(key string, value interface{}) {
 
 	// If writing the file would bring us above quota, remove oldest files as required.
 	// NOTE: If the call to write the data below fails, any files removed WILL be lost.
-	if f.quota > 0 {
-		for f.usage+el.Value.(*file).size > f.quota {
-			f.RemoveOldest()
-		}
+	for f.quota > 0 && f.usage+el.Value.(*file).size > f.quota {
+		f.RemoveOldest()
 	}
 
 	// Write data to file corresponding to key.

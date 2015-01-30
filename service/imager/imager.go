@@ -18,7 +18,9 @@ import (
 
 // The Imager service, containing state shared between methods.
 type Imager struct {
-	Config  *string            // Path to imager.ini file, used for defining sources and their options.
+	CacheSize *int64  // The image cache size maximum, in bytes.
+	Config    *string // Path to imager.ini file, used for defining sources and their options.
+
 	Sources map[string]*Source // A map of sources, indexed under their name.
 }
 
@@ -93,6 +95,10 @@ func (i *Imager) Start() error {
 		} else {
 			i.Sources[sect] = s
 		}
+
+		if err = s.InitCache("alfred/imager", *i.CacheSize); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -114,8 +120,9 @@ func init() {
 
 	fs := flag.NewFlagSet("imager", flag.ContinueOnError)
 	serv := &Imager{
-		Config:  fs.String("config", confPath+"/alfred/imager.ini", ""),
-		Sources: make(map[string]*Source),
+		CacheSize: fs.Int64("cachesize", 0, ""),
+		Config:    fs.String("config", confPath+"/alfred/imager.ini", ""),
+		Sources:   make(map[string]*Source),
 	}
 
 	service.Register("imager", serv, fs)

@@ -14,6 +14,7 @@ type Pipeline struct {
 	Height  int64   `default:"0"`
 	Density float64 `default:"1"`
 	Quality int64   `default:"75"`
+	Fit     string  `default:"crop"`
 }
 
 func NewPipeline() (*Pipeline, error) {
@@ -53,6 +54,8 @@ func (p *Pipeline) SetString(field, value string) error {
 		}
 
 		f.SetFloat(v)
+	case reflect.String:
+		f.SetString(value)
 	default:
 		return fmt.Errorf("field '%s' with type '%s' does not match supported types", field, f.Kind().String())
 	}
