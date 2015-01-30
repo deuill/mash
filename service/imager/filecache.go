@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"os"
 	"path"
+	"sync"
 )
 
 // FileCache implements a simple filesystem-based cache for arbitrary data.
@@ -14,6 +15,8 @@ type FileCache struct {
 
 	order *list.List               // A doubly-linked list of items, ordered by access time.
 	cache map[string]*list.Element // A reverse lookup table of item names to list elements.
+
+	sync.Mutex // Used for controlling concurrent access to item list and cache table.
 }
 
 type file struct {
@@ -23,10 +26,10 @@ type file struct {
 }
 
 func NewFileCache(path string, size int64) (*FileCache, error) {
-	// If directory structure already exists, remove it first.
+	// If directory structure already exists, remove it first, but only if we have a size limit.
 	if fi, err := os.Stat(path); err != nil && !os.IsNotExist(err) {
 		return nil, err
-	} else if fi != nil && fi.IsDir() {
+	} else if fi != nil && fi.IsDir() && size > 0 {
 		if err = os.RemoveAll(path); err != nil {
 			return nil, err
 		}
@@ -56,6 +59,9 @@ func (f *FileCache) Add(key string, value interface{}) {
 	if data, ok = value.([]byte); !ok {
 		return
 	}
+
+	f.Lock()
+	defer f.Unlock()
 
 	// If entry already exists, move to front and return. Otherwise, add a new element in front.
 	if el, ok = f.cache[key]; ok {
@@ -92,13 +98,16 @@ func (f *FileCache) Add(key string, value interface{}) {
 		return
 	}
 
-	f.cache[key] = el
-	f.usage += el.Value.(*file).size
 	el.Value.(*file).fp.Seek(0, 0)
+	f.usage += el.Value.(*file).size
+	f.cache[key] = el
 }
 
 func (f *FileCache) Get(key string) interface{} {
 	if el, exists := f.cache[key]; exists {
+		f.Lock()
+		defer f.Unlock()
+
 		f.order.MoveToFront(el)
 
 		buf := make([]byte, el.Value.(*file).size)
@@ -124,6 +133,9 @@ func (f *FileCache) RemoveOldest() {
 }
 
 func (f *FileCache) removeElement(el *list.Element) {
+	f.Lock()
+	defer f.Unlock()
+
 	// Remove file, close file descriptor and remove filesize from total usage.
 	os.Remove(el.Value.(*file).fp.Name())
 	el.Value.(*file).fp.Close()

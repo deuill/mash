@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os/user"
 	"strings"
@@ -21,7 +22,7 @@ type Imager struct {
 	CacheSize *int64  // The image cache size maximum, in bytes.
 	Config    *string // Path to imager.ini file, used for defining sources and their options.
 
-	Sources map[string]*Source // A map of sources, indexed under their name.
+	sources map[string]*Source // A map of sources, indexed under their name.
 }
 
 func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, error) {
@@ -56,16 +57,32 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		}
 	}
 
-	// Fetch original image from remote server.
-	// FIXME: Allow for sources other than default.
-	file, err := i.Sources["default"].GetFile(path)
+	// Select source to fetch from and push to depending on the request Host field.
+	// If the field is empty or invalid, the default source is used instead.
+	src := i.sources["default"]
+	if r.Host != "" {
+		host, _, _ := net.SplitHostPort(r.Host)
+		if s, ok := i.sources[host]; ok {
+			src = s
+		}
+	}
+
+	// Fetch original image from remote server or local cache.
+	orig, err := src.Get(path)
 	if err != nil {
 		return nil, err
 	}
 
-	w.Write(file)
-
+	writeResponse(orig, "image/jpeg", w)
 	return nil, nil
+}
+
+func writeResponse(data []byte, ctype string, w http.ResponseWriter) {
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	w.Header().Set("Cache-Control", "no-transform,public,max-age=86400,s-maxage=2592000")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }
 
 func (i *Imager) Start() error {
@@ -90,9 +107,9 @@ func (i *Imager) Start() error {
 		}
 
 		if sect == "" {
-			i.Sources["default"] = s
+			i.sources["default"] = s
 		} else {
-			i.Sources[sect] = s
+			i.sources[sect] = s
 		}
 
 		if err = s.InitCache("alfred/imager", *i.CacheSize); err != nil {
@@ -121,7 +138,7 @@ func init() {
 	serv := &Imager{
 		CacheSize: fs.Int64("cachesize", 0, ""),
 		Config:    fs.String("config", confPath+"/alfred/imager.ini", ""),
-		Sources:   make(map[string]*Source),
+		sources:   make(map[string]*Source),
 	}
 
 	service.Register("imager", serv, fs)
