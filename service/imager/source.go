@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	// Third-party packages
-	"github.com/mitchellh/goamz/aws"
-	"github.com/mitchellh/goamz/s3"
+	"github.com/goamz/goamz/aws"
+	"github.com/goamz/goamz/s3"
 )
 
 // A Source represents an image source, which is usually matched against a URL endpoint, and
@@ -19,7 +20,8 @@ type Source struct {
 }
 
 func NewSource(region, bucket, accessKey, secretKey string) (*Source, error) {
-	auth, err := aws.GetAuth(accessKey, secretKey)
+	// Authorization token is set to expire 5 years in the future.
+	auth, err := aws.GetAuth(accessKey, secretKey, "", time.Now().AddDate(5, 0, 0))
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +49,7 @@ func (s *Source) InitCache(base string, size int64) error {
 	return nil
 }
 
-func (s *Source) GetFile(path string) ([]byte, error) {
+func (s *Source) Get(path string) ([]byte, error) {
 	// Check for locally cached data.
 	if s.cache != nil {
 		if data := s.cache.Get(path); data != nil {
