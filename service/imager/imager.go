@@ -40,7 +40,7 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		return nil, fmt.Errorf("failed to decode base64-encoded parameters")
 	}
 
-	pline, err := NewPipeline()
+	pipeline, err := NewPipeline()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize pipeline: %s", err)
 	}
@@ -52,20 +52,14 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		}
 
 		key, value := t[0], strings.TrimSpace(t[1])
-		if err = pline.SetString(key, value); err != nil {
+		if err = pipeline.SetString(key, value); err != nil {
 			return nil, err
 		}
 	}
 
 	// Select source to fetch from and push to depending on the request Host field.
 	// If the field is empty or invalid, the default source is used instead.
-	src := i.sources["default"]
-	if r.Host != "" {
-		host, _, _ := net.SplitHostPort(r.Host)
-		if s, ok := i.sources[host]; ok {
-			src = s
-		}
-	}
+	src := i.getSource(r.Host)
 
 	// Fetch original image from remote server or local cache.
 	orig, err := src.Get(path)
@@ -73,13 +67,32 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		return nil, err
 	}
 
-	writeResponse(orig, "image/jpeg", w)
+	// Process image through pipeline.
+	img, err := pipeline.Process(orig)
+	if err != nil {
+		return nil, err
+	}
+
+	writeResponse(img.Data, img.Size, img.Type, w)
+
 	return nil, nil
 }
 
-func writeResponse(data []byte, ctype string, w http.ResponseWriter) {
+func (i *Imager) getSource(host string) *Source {
+	src := i.sources["default"]
+	if host != "" {
+		h, _, _ := net.SplitHostPort(host)
+		if s, ok := i.sources[h]; ok {
+			src = s
+		}
+	}
+
+	return src
+}
+
+func writeResponse(data []byte, size int64, ctype string, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", ctype)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
 	w.Header().Set("Cache-Control", "no-transform,public,max-age=86400,s-maxage=2592000")
 	w.WriteHeader(http.StatusOK)
 	w.Write(data)

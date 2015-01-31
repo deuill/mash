@@ -2,6 +2,7 @@ package imager
 
 import (
 	"container/list"
+	"io/ioutil"
 	"os"
 	"path"
 	"sync"
@@ -104,6 +105,7 @@ func (f *FileCache) Add(key string, value interface{}) {
 }
 
 func (f *FileCache) Get(key string) interface{} {
+	// Check reverse lookup table for file entry.
 	if el, exists := f.cache[key]; exists {
 		f.Lock()
 		defer f.Unlock()
@@ -114,6 +116,12 @@ func (f *FileCache) Get(key string) interface{} {
 		el.Value.(*file).fp.Read(buf)
 		el.Value.(*file).fp.Seek(0, 0)
 
+		return buf
+	}
+
+	// There is a possibility that the file exists on disk but is not yet tracked. If so, add it.
+	if buf, err := ioutil.ReadFile(path.Join(f.path, key)); err == nil {
+		f.Add(key, buf)
 		return buf
 	}
 
