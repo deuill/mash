@@ -13,9 +13,10 @@ Alfred, and methods attached to that type which correspond to available tasks wi
 
 In order to demonstrate the rules required for writing a service, we are going to build a sample
 service named `helloworld`, which defines two tasks, one which responds with "Hello World!" and
-another which responds with "Goodbye World!". The service also defines a configuration variable
-`name` which overrides the default value of "World" and allows the service to respond with a
-custom name (see.g. "Hello Alex!").
+another which responds with "Goodbye World!".
+
+The service also defines a configuration variable `name` which overrides the default value of "World"
+and allows the service to respond with a custom name (e.g. "Hello Alex!").
 
 ```go
 package helloworld
@@ -89,13 +90,16 @@ And any valid method receiver has to implement these two methods _at least_.
 
 ```go
 func (s *ServiceName) Start() error
+```
+
+```go
 func (s *ServiceName) Stop() error
 ```
 
 These two methods implement the `Service` interface defined in the service host. Method `Start`
 executes once when Alfred starts up, before the internal HTTP service is initialized, and most
 commonly contains calls to `service.RegisterHandler()`, used for attaching specific methods to
-the service host (which then attaches them as URL endpoints, as explained below).
+the service host (which also attaches them as URL endpoints, as explained below).
 
 ```go
 func init()
@@ -114,9 +118,18 @@ After all registered services complete their initialization routine, the service
 internal HTTP server and begins accepting requests on a specified TCP port (default is 6116).
 
 Methods registered using `service.RegisterHandler()` are made available under the URL scheme of
-`/<servicename>/<methodname>/`, where `servicename` and `methodname` correspond to the first and
-second parameters accepted by `service.RegisterHandler()`. Any method registered in this way is
-expected to correspond to the following declaration:
+"/<servicename>/<methodname>/", where `servicename` and `methodname` correspond to the first and
+second parameters accepted by `service.RegisterHandler()`.
+
+So, for the example calls above, you would get the following URL endpoints, for a local server running
+with the default options:
+
+```
+http://localhost:6116/helloworld/hello
+http://localhost:6116/helloworld/goodbye
+```
+
+Any method registered in this way is expected to correspond to the following declaration:
 
 ```go
 func (h *ServiceName) MethodName(r *http.Request, w http.ResponseWriter) (interface{}, error)
@@ -128,4 +141,5 @@ returned as JSON documents to the caller. If more control over the response is n
 `http.ResponseWriter` type is also available.
 
 Use of this type and returning of values to be serialized is mutually exclusive, so choose whichever
-fits best for you and return a `nil` interface{} type if a method is to use the ResponseWriter directly.
+fits best for you and return `nil` for the interface{} type if a method is to use `http.ResponseWriter`
+directly.
