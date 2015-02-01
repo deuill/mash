@@ -110,7 +110,6 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	}
 
 	vipsImg := C.vips_image_new()
-	defer C.g_object_unref(C.gpointer(vipsImg))
 
 	defer C.vips_error_clear()
 	defer C.vips_thread_shutdown()
@@ -197,7 +196,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 			return nil, fmt.Errorf("failed to shrink JPEG image: %s", e)
 		}
 
-		C.Vips_copy(vipsShrunk, &vipsImg)
+		C.Vips_copy_clear(vipsShrunk, &vipsImg)
 	}
 
 	// We shrink the image by an integer factor, if the factor is bigger than 1.
@@ -219,7 +218,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 			residual = math.Min(rx, ry)
 		}
 
-		C.Vips_copy(vipsShrunk, &vipsImg)
+		C.Vips_copy_clear(vipsShrunk, &vipsImg)
 	}
 
 	// Resize image by the residual factor, if any is left over.
@@ -231,7 +230,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 			return nil, fmt.Errorf("failed to resize image: %s", e)
 		}
 
-		C.Vips_copy(vipsAffined, &vipsImg)
+		C.Vips_copy_clear(vipsAffined, &vipsImg)
 	}
 
 	// Crop image if required.
@@ -246,13 +245,13 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 			return nil, fmt.Errorf("failed to crop image: %s", e)
 		}
 
-		C.Vips_copy(vipsCropped, &vipsImg)
+		C.Vips_copy_clear(vipsCropped, &vipsImg)
 	}
 
 	// Convert to sRGB colour space.
 	vipsColourspaced := C.vips_image_new()
 	C.Vips_colourspace(vipsImg, &vipsColourspaced, C.VIPS_INTERPRETATION_sRGB)
-	C.Vips_copy(vipsColourspaced, &vipsImg)
+	C.Vips_copy_clear(vipsColourspaced, &vipsImg)
 
 	// Save image to buffer.
 	length := C.size_t(0)
@@ -260,18 +259,18 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 	switch img.Type {
 	case "image/jpeg":
-		C.Vips_save_jpeg(vipsColourspaced, &ptr, &length, C.int(p.Quality))
+		C.Vips_save_jpeg(vipsImg, &ptr, &length, C.int(p.Quality))
 	case "image/png":
-		C.Vips_save_png(vipsColourspaced, &ptr, &length, C.int(9))
+		C.Vips_save_png(vipsImg, &ptr, &length, C.int(9))
 	}
 
 	img.Data = C.GoBytes(ptr, C.int(length))
 	img.Size = int64(len(img.Data))
-	img.Width = int64(vipsColourspaced.Xsize)
-	img.Height = int64(vipsColourspaced.Ysize)
+	img.Width = int64(vipsImg.Xsize)
+	img.Height = int64(vipsImg.Ysize)
 
 	// Clean up data.
-	C.g_object_unref(C.gpointer(vipsColourspaced))
+	C.g_object_unref(C.gpointer(vipsImg))
 	C.free(ptr)
 
 	return &img, nil

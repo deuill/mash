@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	_ "net/http/pprof"
-
 	// Third-party packages
 	"github.com/rakyll/globalconf"
 )

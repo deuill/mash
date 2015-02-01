@@ -48,7 +48,7 @@ int Vips_colourspace(VipsImage *in, VipsImage **out, VipsInterpretation space) {
 	return vips_colourspace(in, out, space, NULL);
 };
 
-int Vips_copy(VipsImage *in, VipsImage **out) {
+int Vips_copy_clear(VipsImage *in, VipsImage **out) {
 	g_object_unref(*out);
 	*out = vips_image_new();
 
