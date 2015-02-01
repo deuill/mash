@@ -6,54 +6,75 @@ int Vips_init() {
 	return vips_init("alfred.imager.vips");
 }
 
-int Vips_load_jpeg(void *buf, size_t len, VipsImage **out) {
-	return vips_jpegload_buffer(buf, len, out, "access", VIPS_ACCESS_SEQUENTIAL, NULL);
+VipsImage *Vips_image_init() {
+	VipsImage *image = NULL;
+	return image;
 }
 
-int Vips_load_png(void *buf, size_t len, VipsImage **out) {
-	return vips_pngload_buffer(buf, len, out, "access", VIPS_ACCESS_SEQUENTIAL, NULL);
+VipsImage *Vips_load_jpeg(void *buf, size_t len) {
+	VipsImage *image = NULL;
+	vips_jpegload_buffer(buf, len, &image, "access", VIPS_ACCESS_SEQUENTIAL, NULL);
+	return image;
 }
 
-int Vips_save_jpeg(VipsImage *in, void **buf, size_t *len, int quality) {
-	return vips_jpegsave_buffer(in, buf, len, "Q", quality, "strip", 1, "optimize_coding", TRUE, NULL);
+VipsImage *Vips_shrink_load_jpeg(void *buf, size_t len, int shrink) {
+	VipsImage *image = NULL;
+	vips_jpegload_buffer(buf, len, &image, "shrink", shrink, NULL);
+	return image;
 }
 
-int Vips_save_png(VipsImage *in, void **buf, size_t *len, int compression) {
-	return vips_pngsave_buffer(in, buf, len, "compression", compression, NULL);
+void *Vips_save_jpeg(VipsImage *in, size_t *len, int quality) {
+	void *buf = NULL;
+	vips_jpegsave_buffer(in, &buf, len, "Q", quality, "strip", 1, "optimize_coding", TRUE, NULL);
+	return buf;
 }
 
-int Vips_shrink_load_jpeg(void *buf, size_t len, VipsImage **out, int shrink) {
-	return vips_jpegload_buffer(buf, len, out, "shrink", shrink, NULL);
+VipsImage *Vips_load_png(void *buf, size_t len) {
+	VipsImage *image = NULL;
+	vips_pngload_buffer(buf, len, &image, "access", VIPS_ACCESS_SEQUENTIAL, NULL);
+	return image;
 }
 
-int Vips_shrink(VipsImage *in, VipsImage **out, double xshrink, double yshrink) {
-	return vips_shrink(in, out, xshrink, yshrink, NULL);
+void *Vips_save_png(VipsImage *in, size_t *len, int compression) {
+	void *buf = NULL;
+	vips_pngsave_buffer(in, &buf, len, "compression", compression, NULL);
+	return buf;
+}
+
+VipsImage *Vips_shrink(VipsImage *in, double xshrink, double yshrink) {
+	VipsImage *image = NULL;
+	vips_shrink(in, &image, xshrink, yshrink, NULL);
+	return image;
 };
 
-int Vips_affine_bilinear(VipsImage *in, VipsImage **out, double a, double b, double c, double d) {
+VipsImage *Vips_affine_bilinear(VipsImage *in, double a, double b, double c, double d) {
+	VipsImage *image = NULL;
 	VipsInterpolate *interpolator = vips_interpolate_new("bilinear");
-	return vips_affine(in, out, a, b, c, d, "interpolate", interpolator, NULL);
+
+	vips_affine(in, &image, a, b, c, d, "interpolate", interpolator, NULL);
+	g_object_unref(interpolator);
+
+	return image;
 };
 
-int Vips_affine_bicubic(VipsImage *in, VipsImage **out, double a, double b, double c, double d) {
+VipsImage *Vips_affine_bicubic(VipsImage *in, double a, double b, double c, double d) {
+	VipsImage *image = NULL;
 	VipsInterpolate *interpolator = vips_interpolate_new("bicubic");
-	return vips_affine(in, out, a, b, c, d, "interpolate", interpolator, NULL);
+
+	vips_affine(in, &image, a, b, c, d, "interpolate", interpolator, NULL);
+	g_object_unref(interpolator);
+
+	return image;
 };
 
-int Vips_crop(VipsImage *in, VipsImage **out, int left, int top, int width, int height) {
-	return vips_extract_area(in, out, left, top, width, height, NULL);
+VipsImage *Vips_crop(VipsImage *in, int left, int top, int width, int height) {
+	VipsImage *image = NULL;
+	vips_extract_area(in, &image, left, top, width, height, NULL);
+	return image;
 }
 
-int Vips_colourspace(VipsImage *in, VipsImage **out, VipsInterpretation space) {
-	return vips_colourspace(in, out, space, NULL);
+VipsImage *Vips_colourspace(VipsImage *in, VipsInterpretation space) {
+	VipsImage *image = NULL;
+	vips_colourspace(in, &image, space, NULL);
+	return image;
 };
-
-int Vips_copy_clear(VipsImage *in, VipsImage **out) {
-	g_object_unref(*out);
-	*out = vips_image_new();
-
-	int result = vips_copy(in, out, NULL);
-	g_object_unref(in);
-
-	return result;
-}

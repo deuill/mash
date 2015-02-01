@@ -109,17 +109,23 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 		return nil, fmt.Errorf("unknown image type, cannot process")
 	}
 
-	vipsImg := C.vips_image_new()
+	vipsImg := C.Vips_image_init()
 
 	defer C.vips_error_clear()
 	defer C.vips_thread_shutdown()
 
 	switch img.Type {
 	case "image/jpeg":
-		C.Vips_load_jpeg(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size), &vipsImg)
+		vipsImg = C.Vips_load_jpeg(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size))
 	case "image/png":
-		C.Vips_load_png(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size), &vipsImg)
+		vipsImg = C.Vips_load_png(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size))
 	}
+
+	if vipsImg == nil {
+		return nil, fmt.Errorf("failed to load image of type '%s'", img.Type)
+	}
+
+	defer C.g_object_unref(C.gpointer(vipsImg))
 
 	img.Width = int64(vipsImg.Xsize)
 	img.Height = int64(vipsImg.Ysize)
@@ -188,22 +194,21 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 		shrink = int(math.Floor(factor))
 		residual = float64(shrink) / factor
 
-		vipsShrunk := C.vips_image_new()
 		ptr := unsafe.Pointer(&img.Data[0])
-		err := C.Vips_shrink_load_jpeg(ptr, C.size_t(img.Size), &vipsShrunk, C.int(shrinkLoad))
-		if err != 0 {
+		vipsShrunk := C.Vips_shrink_load_jpeg(ptr, C.size_t(img.Size), C.int(shrinkLoad))
+		if vipsShrunk == nil {
 			e := C.GoString(C.vips_error_buffer())
 			return nil, fmt.Errorf("failed to shrink JPEG image: %s", e)
 		}
 
-		C.Vips_copy_clear(vipsShrunk, &vipsImg)
+		defer C.g_object_unref(C.gpointer(vipsShrunk))
+		vipsImg = vipsShrunk
 	}
 
 	// We shrink the image by an integer factor, if the factor is bigger than 1.
 	if shrink > 1 {
-		vipsShrunk := C.vips_image_new()
-		err := C.Vips_shrink(vipsImg, &vipsShrunk, C.double(float64(shrink)), C.double(float64(shrink)))
-		if err != 0 {
+		vipsShrunk := C.Vips_shrink(vipsImg, C.double(float64(shrink)), C.double(float64(shrink)))
+		if vipsShrunk == nil {
 			e := C.GoString(C.vips_error_buffer())
 			return nil, fmt.Errorf("failed to shrink image: %s", e)
 		}
@@ -218,19 +223,20 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 			residual = math.Min(rx, ry)
 		}
 
-		C.Vips_copy_clear(vipsShrunk, &vipsImg)
+		defer C.g_object_unref(C.gpointer(vipsShrunk))
+		vipsImg = vipsShrunk
 	}
 
 	// Resize image by the residual factor, if any is left over.
 	if residual != 0 {
-		vipsAffined := C.vips_image_new()
-		err := C.Vips_affine_bilinear(vipsImg, &vipsAffined, C.double(residual), 0, 0, C.double(residual))
-		if err != 0 {
+		vipsAffined := C.Vips_affine_bilinear(vipsImg, C.double(residual), 0, 0, C.double(residual))
+		if vipsAffined == nil {
 			e := C.GoString(C.vips_error_buffer())
 			return nil, fmt.Errorf("failed to resize image: %s", e)
 		}
 
-		C.Vips_copy_clear(vipsAffined, &vipsImg)
+		defer C.g_object_unref(C.gpointer(vipsAffined))
+		vipsImg = vipsAffined
 	}
 
 	// Crop image if required.
@@ -238,40 +244,43 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 		p.Width = int64(math.Min(float64(vipsImg.Xsize), float64(p.Width)))
 		p.Height = int64(math.Min(float64(vipsImg.Ysize), float64(p.Height)))
 
-		vipsCropped := C.vips_image_new()
-		err := C.Vips_crop(vipsImg, &vipsCropped, C.int(0), C.int(0), C.int(p.Width), C.int(p.Height))
-		if err != 0 {
+		vipsCropped := C.Vips_crop(vipsImg, C.int(0), C.int(0), C.int(p.Width), C.int(p.Height))
+		if vipsCropped == nil {
 			e := C.GoString(C.vips_error_buffer())
 			return nil, fmt.Errorf("failed to crop image: %s", e)
 		}
 
-		C.Vips_copy_clear(vipsCropped, &vipsImg)
+		defer C.g_object_unref(C.gpointer(vipsCropped))
+		vipsImg = vipsCropped
 	}
 
 	// Convert to sRGB colour space.
-	vipsColourspaced := C.vips_image_new()
-	C.Vips_colourspace(vipsImg, &vipsColourspaced, C.VIPS_INTERPRETATION_sRGB)
-	C.Vips_copy_clear(vipsColourspaced, &vipsImg)
+	vipsColourspaced := C.Vips_colourspace(vipsImg, C.VIPS_INTERPRETATION_sRGB)
+	if vipsColourspaced == nil {
+		e := C.GoString(C.vips_error_buffer())
+		return nil, fmt.Errorf("failed to convert colour space for image: %s", e)
+	}
+
+	defer C.g_object_unref(C.gpointer(vipsColourspaced))
+	vipsImg = vipsColourspaced
 
 	// Save image to buffer.
+	var ptr unsafe.Pointer
 	length := C.size_t(0)
-	ptr := C.malloc(C.size_t(len(buf)))
 
 	switch img.Type {
 	case "image/jpeg":
-		C.Vips_save_jpeg(vipsImg, &ptr, &length, C.int(p.Quality))
+		ptr = C.Vips_save_jpeg(vipsImg, &length, C.int(p.Quality))
 	case "image/png":
-		C.Vips_save_png(vipsImg, &ptr, &length, C.int(9))
+		ptr = C.Vips_save_png(vipsImg, &length, C.int(9))
 	}
+
+	defer C.free(ptr)
 
 	img.Data = C.GoBytes(ptr, C.int(length))
 	img.Size = int64(len(img.Data))
 	img.Width = int64(vipsImg.Xsize)
 	img.Height = int64(vipsImg.Ysize)
-
-	// Clean up data.
-	C.g_object_unref(C.gpointer(vipsImg))
-	C.free(ptr)
 
 	return &img, nil
 }
