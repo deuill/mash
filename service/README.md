@@ -118,7 +118,7 @@ After all registered services complete their initialization routine, the service
 internal HTTP server and begins accepting requests on a specified TCP port (default is 6116).
 
 Methods registered using `service.RegisterHandler()` are made available under the URL scheme of
-"/<servicename>/<methodname>/", where `servicename` and `methodname` correspond to the first and
+"/servicename/methodname/", where `servicename` and `methodname` correspond to the first and
 second parameters accepted by `service.RegisterHandler()`.
 
 So, for the example calls above, you would get the following URL endpoints, for a local server running

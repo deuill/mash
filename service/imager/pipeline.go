@@ -18,11 +18,12 @@ import (
 // A Pipeline represents all data required for converting an image from its original format to the
 // processed result.
 type Pipeline struct {
-	Width   int64   `default:"0"`
-	Height  int64   `default:"0"`
-	Density float64 `default:"1"`
-	Quality int64   `default:"75"`
-	Fit     string  `default:"crop"`
+	Width   int64     `default:"0"`
+	Height  int64     `default:"0"`
+	Quality int64     `default:"75" min:"1" max:"100"`
+	Fit     string    `default:"crop"`
+	Crop    string    `default:"top"`
+	Focus   []float64 `default:"0:0:0:0" delim:":"`
 }
 
 func NewPipeline() (*Pipeline, error) {
@@ -41,28 +42,53 @@ func NewPipeline() (*Pipeline, error) {
 }
 
 func (p *Pipeline) SetString(field, value string) error {
+	fname := strings.Title(field)
+
 	pv := reflect.ValueOf(p).Elem()
-	f := pv.FieldByName(strings.Title(field))
-	if f.Kind() == reflect.Invalid {
+	ft, exists := pv.Type().FieldByName(fname)
+	if !exists {
 		return fmt.Errorf("field with name '%s' not found", field)
 	}
 
-	switch f.Kind() {
-	case reflect.Int64:
+	f := pv.FieldByName(fname)
+	switch {
+	case f.Kind() == reflect.Slice && f.Type().Elem().Kind() == reflect.Float64:
+		f.Set(reflect.Zero(f.Type()))
+
+		s := strings.Split(value, ft.Tag.Get("delim"))
+		for _, sv := range s {
+			v, err := strconv.ParseFloat(sv, 64)
+			if err != nil {
+				return fmt.Errorf("unable to convert value to concrete type: %s", err)
+			}
+
+			f.Set(reflect.Append(f, reflect.ValueOf(v)))
+		}
+	case f.Kind() == reflect.Int64:
 		v, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return fmt.Errorf("unable to convert value to concrete 'int64' type: %s", err)
+			return fmt.Errorf("unable to convert value to concrete type: %s", err)
+		}
+
+		// Check for minimum and maximum values.
+		if ft.Tag.Get("min") != "" && ft.Tag.Get("max") != "" {
+			min, _ := strconv.ParseInt(ft.Tag.Get("min"), 10, 64)
+			max, _ := strconv.ParseInt(ft.Tag.Get("max"), 10, 64)
+
+			if v < min || v > max {
+				return fmt.Errorf("value passed for '%s' is outside the limit '%d - %d': %d", field, min, max, v)
+			}
 		}
 
 		f.SetInt(v)
-	case reflect.Float64:
+	case f.Kind() == reflect.Float64:
 		v, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return fmt.Errorf("unable to convert value to concrete 'float64' type: %s", err)
+			return fmt.Errorf("unable to convert value to concrete type: %s", err)
 		}
 
 		f.SetFloat(v)
-	case reflect.String:
+	case f.Kind() == reflect.String:
 		f.SetString(value)
 	default:
 		return fmt.Errorf("field '%s' with type '%s' does not match supported types", field, f.Kind().String())
@@ -74,11 +100,9 @@ func (p *Pipeline) SetString(field, value string) error {
 // Image represents a processed image, and contains the image data as a byte slice along with other
 // useful information about the image.
 type Image struct {
-	Data   []byte
-	Size   int64
-	Type   string
-	Width  int64
-	Height int64
+	Data []byte // The image data buffer
+	Size int64  // The image size, in bytes.
+	Type string // The image MIME type.
 }
 
 // A map of supported image MIME types against their magic numbers.
@@ -90,7 +114,7 @@ var imageTypes = map[string][]byte{
 
 func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	// Image definition for generated image.
-	img := Image{buf, int64(len(buf)), "", 0, 0}
+	img := Image{buf, int64(len(buf)), ""}
 
 	// Detect file type for image in buffer.
 	for t, sig := range imageTypes {
@@ -127,13 +151,12 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 	defer C.g_object_unref(C.gpointer(vipsImg))
 
-	img.Width = int64(vipsImg.Xsize)
-	img.Height = int64(vipsImg.Ysize)
-
-	factor := 0.0
+	var factor float64
+	imgWidth := int64(vipsImg.Xsize)
+	imgHeight := int64(vipsImg.Ysize)
 
 	// If the pipeline requests an enlarged image, or dimensions equal to original image, return original.
-	if (p.Width > img.Width || p.Height > img.Height) || (p.Width == img.Width && p.Height == img.Height) {
+	if (p.Width > imgWidth || p.Height > imgHeight) || (p.Width == imgWidth && p.Height == imgHeight) {
 		return &img, nil
 	}
 
@@ -141,8 +164,8 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	switch {
 	// Fixed width and height.
 	case p.Width > 0 && p.Height > 0:
-		xf := float64(img.Width) / float64(p.Width)
-		yf := float64(img.Height) / float64(p.Height)
+		xf := float64(imgWidth) / float64(p.Width)
+		yf := float64(imgHeight) / float64(p.Height)
 
 		// We choose the smallest delta when cropping, and the largest when we're not.
 		if p.Fit == "crop" {
@@ -152,12 +175,12 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 		}
 	// Fixed width, auto height.
 	case p.Width > 0:
-		factor = float64(img.Width) / float64(p.Width)
-		p.Height = int64(math.Floor(float64(img.Height) / factor))
+		factor = float64(imgWidth) / float64(p.Width)
+		p.Height = int64(math.Floor(float64(imgHeight) / factor))
 	// Fixed height, auto width.
 	case p.Height > 0:
-		factor = float64(img.Height) / float64(p.Height)
-		p.Width = int64(math.Floor(float64(img.Width) / factor))
+		factor = float64(imgHeight) / float64(p.Height)
+		p.Width = int64(math.Floor(float64(imgWidth) / factor))
 	// No change requested, return original image.
 	default:
 		return &img, nil
@@ -165,7 +188,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 	// We resize images in a two-step operation, first shrinking the image by an integer factor,
 	// then calculating the floating-point residual and interpolating the result.
-	shrink := int(math.Floor(factor))
+	shrink := int64(math.Floor(factor))
 	if shrink < 1 {
 		shrink = 1
 	}
@@ -191,7 +214,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 		// Recalculate shrink and residual values for shrunk image.
 		factor = math.Max(factor, 1.0)
-		shrink = int(math.Floor(factor))
+		shrink = int64(math.Floor(factor))
 		residual = float64(shrink) / factor
 
 		ptr := unsafe.Pointer(&img.Data[0])
@@ -241,10 +264,48 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 	// Crop image if required.
 	if p.Fit == "crop" && (int64(vipsImg.Xsize) != p.Width || int64(vipsImg.Ysize) != p.Height) {
-		p.Width = int64(math.Min(float64(vipsImg.Xsize), float64(p.Width)))
-		p.Height = int64(math.Min(float64(vipsImg.Ysize), float64(p.Height)))
+		var cx, cy int64
+		w, h := int64(vipsImg.Xsize), int64(vipsImg.Ysize)
 
-		vipsCropped := C.Vips_crop(vipsImg, C.int(0), C.int(0), C.int(p.Width), C.int(p.Height))
+		switch p.Crop {
+		// Crop using specified bounding box as center of focus.
+		case "focus":
+			if len(p.Focus) != 4 {
+				return nil, fmt.Errorf("failed to crop image: invalid format for focus box")
+			}
+
+			bx, bw := p.Focus[0], p.Focus[2]
+			by, bh := p.Focus[1], p.Focus[2]
+
+			// Recalculate bounding box position and dimensions based on the resize factor.
+			factor = math.Max(float64((imgWidth / w)), float64((imgHeight / h)))
+
+			// Find X and Y offset for the crop bounding box and keep the value within constraints.
+			cx = int64(math.Floor(((bx + (bw / 2)) / factor))) - (p.Width / 2)
+			cx = int64(math.Min(math.Max(0, float64(cx)), float64((w - p.Width))))
+
+			cy = int64(math.Floor(((by + (bh / 2)) / factor))) - (p.Height / 2)
+			cy = int64(math.Min(math.Max(0, float64(cy)), float64((h - p.Height))))
+		// Crop from the right to left.
+		case "right":
+			cy = (h - p.Height + 1) / 2
+		// Crop from the left to right.
+		case "left":
+			cx = w - p.Width
+			cy = (h - p.Height + 1) / 2
+		// Crop from the bottom up.
+		case "bottom":
+			cx = (w - p.Width + 1) / 2
+		// Crop from the top down.
+		default:
+			cx = (w - p.Width + 1) / 2
+			cy = h - p.Height
+		}
+
+		p.Width = int64(math.Min(float64(w), float64(p.Width)))
+		p.Height = int64(math.Min(float64(h), float64(p.Height)))
+
+		vipsCropped := C.Vips_crop(vipsImg, C.int(cx), C.int(cy), C.int(p.Width), C.int(p.Height))
 		if vipsCropped == nil {
 			e := C.GoString(C.vips_error_buffer())
 			return nil, fmt.Errorf("failed to crop image: %s", e)
@@ -279,8 +340,6 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 	img.Data = C.GoBytes(ptr, C.int(length))
 	img.Size = int64(len(img.Data))
-	img.Width = int64(vipsImg.Xsize)
-	img.Height = int64(vipsImg.Ysize)
 
 	return &img, nil
 }

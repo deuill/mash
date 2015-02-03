@@ -51,7 +51,7 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 			return nil, fmt.Errorf("request parameter for pipeline is malformed: '%s'", p)
 		}
 
-		key, value := t[0], strings.TrimSpace(t[1])
+		key, value := strings.TrimSpace(t[0]), strings.TrimSpace(t[1])
 		if err = pipeline.SetString(key, value); err != nil {
 			return nil, err
 		}
