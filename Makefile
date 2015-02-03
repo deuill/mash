@@ -12,7 +12,7 @@ REPO     = github.com/Hearst-Digital/alfred
 
 SERVICES = $(shell find service/* -maxdepth 1 -type d)
 
-.PHONY: $(PROGRAM) depend
+.PHONY: $(PROGRAM)
 all: $(PROGRAM)
 
 $(PROGRAM): depend
@@ -22,8 +22,8 @@ $(PROGRAM): depend
 	@go build -compiler $(COMPILER) -o .tmp/$(PROGRAM)
 
 depend:
-	$(file > services.go,package main)
-	$(foreach srv, $(SERVICES), $(file >> services.go,import _ "$(REPO)/$(srv)"))
+	$(shell echo "package main"  > services.go)
+	$(foreach srv, $(SERVICES), $(shell echo "import _ \"$(REPO)/$(srv)\""  >> services.go))
 
 install:
 	@echo -e "\033[1mInstalling '$(PROGRAM)' and data...\033[0m"
