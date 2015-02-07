@@ -106,13 +106,12 @@ type Image struct {
 }
 
 func (p *Pipeline) Process(buf []byte) (*Image, error) {
-	// Image definition for generated image.
-	img := Image{buf, int64(len(buf)), GetFileType(buf)}
-
-	if img.Type == "application/octet-stream" {
+	imgType := GetFileType(buf)
+	if imgType == "application/octet-stream" {
 		return nil, fmt.Errorf("unknown image type, cannot process")
 	}
 
+	img := Image{buf, int64(len(buf)), imgType}
 	vipsImg := C.Vips_image_init()
 
 	defer C.vips_error_clear()
@@ -312,7 +311,8 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	case "image/jpeg":
 		ptr = C.Vips_save_jpeg(vipsImg, &length, C.int(p.Quality))
 	case "image/png":
-		ptr = C.Vips_save_png(vipsImg, &length, C.int(9))
+		q := math.Min(math.Floor(float64(p.Quality/10)), 9)
+		ptr = C.Vips_save_png(vipsImg, &length, C.int(q))
 	}
 
 	defer C.free(ptr)
