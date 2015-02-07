@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os/user"
+	"path"
 	"strings"
 
 	// Internal packages
@@ -32,10 +33,23 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		return nil, fmt.Errorf("image URL is unset or empty")
 	}
 
-	data, path := fields[3], fields[4]
+	params, filepath := fields[3], fields[4]
+
+	dir, file := path.Split(filepath)
+	procpath := path.Join(dir, params, file)
+
+	// Select source to fetch from and push to depending on the request Host field.
+	// If the field is empty or invalid, the default source is used instead.
+	src := i.getSource(r.Host)
+
+	// Fetch existing processed file, if any.
+	if data, _ := src.Get(procpath); data != nil {
+		writeResponse(data, int64(len(data)), GetFileType(data), w)
+		return nil, nil
+	}
 
 	// Unpack request parameters and prepare a pipeline for subsequent operations.
-	params, err := base64.StdEncoding.DecodeString(data)
+	req, err := base64.StdEncoding.DecodeString(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode base64-encoded parameters")
 	}
@@ -45,7 +59,7 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		return nil, fmt.Errorf("failed to initialize pipeline: %s", err)
 	}
 
-	for _, p := range strings.Split(string(params), ",") {
+	for _, p := range strings.Split(string(req), ",") {
 		t := strings.Split(p, "=")
 		if len(t) != 2 {
 			return nil, fmt.Errorf("request parameter for pipeline is malformed: '%s'", p)
@@ -57,22 +71,22 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 		}
 	}
 
-	// Select source to fetch from and push to depending on the request Host field.
-	// If the field is empty or invalid, the default source is used instead.
-	src := i.getSource(r.Host)
-
 	// Fetch original image from remote server or local cache.
-	orig, err := src.Get(path)
+	origImg, err := src.Get(filepath)
 	if err != nil {
 		return nil, err
 	}
 
 	// Process image through pipeline.
-	img, err := pipeline.Process(orig)
+	img, err := pipeline.Process(origImg)
 	if err != nil {
 		return nil, err
 	}
 
+	// Store image in local cache and upload to S3 bucket asynchronously.
+	go src.Put(procpath, img.Data, img.Type)
+
+	// Write response back to user.
 	writeResponse(img.Data, img.Size, img.Type, w)
 
 	return nil, nil
@@ -139,18 +153,17 @@ func (i *Imager) Stop() error {
 
 // Package initialization, attaches options and registers service with Alfred.
 func init() {
-	// Fallback configuration directory is '/etc/alfred'.
-	confPath := "/etc"
+	var confPath string
 
 	// Attempt to set default configuration directory to user's home.
 	if u, _ := user.Current(); u != nil {
-		confPath = u.HomeDir + "/.config"
+		confPath = u.HomeDir + "/.config/alfred/"
 	}
 
 	fs := flag.NewFlagSet("imager", flag.ContinueOnError)
 	serv := &Imager{
 		CacheSize: fs.Int64("cachesize", 0, ""),
-		Config:    fs.String("config", confPath+"/alfred/imager.ini", ""),
+		Config:    fs.String("config", confPath+"imager.ini", ""),
 		sources:   make(map[string]*Source),
 	}
 
