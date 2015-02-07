@@ -105,31 +105,11 @@ type Image struct {
 	Type string // The image MIME type.
 }
 
-// A map of supported image MIME types against their magic numbers.
-var imageTypes = map[string][]byte{
-	"image/jpeg": []byte{0xff, 0xd8},
-	"image/png":  []byte{0x89, 0x50},
-	"image/gif":  []byte{0x47, 0x49},
-}
-
 func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	// Image definition for generated image.
-	img := Image{buf, int64(len(buf)), ""}
+	img := Image{buf, int64(len(buf)), GetFileType(buf)}
 
-	// Detect file type for image in buffer.
-	for t, sig := range imageTypes {
-		if bytes.Equal(img.Data[:2], sig) {
-			img.Type = t
-		}
-	}
-
-	switch img.Type {
-	// GIF images are not supported by VIPS directly, and as such must be handled as a special case.
-	// This is done by extracting the frames in a GIF, processing them as PNG images, and converting
-	// back to a GIF once VIPS is done processing each frame individually.
-	case "image/gif":
-		return nil, fmt.Errorf("images in GIF format are not supported yet")
-	case "":
+	if img.Type == "application/octet-stream" {
 		return nil, fmt.Errorf("unknown image type, cannot process")
 	}
 
@@ -279,12 +259,11 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 			// Recalculate bounding box position and dimensions based on the resize factor.
 			factor = math.Max(float64((imgWidth / w)), float64((imgHeight / h)))
+			cx = int64(math.Floor(((bx + (bw / 2)) / factor))) - (p.Width / 2)
+			cy = int64(math.Floor(((by + (bh / 2)) / factor))) - (p.Height / 2)
 
 			// Find X and Y offset for the crop bounding box and keep the value within constraints.
-			cx = int64(math.Floor(((bx + (bw / 2)) / factor))) - (p.Width / 2)
 			cx = int64(math.Min(math.Max(0, float64(cx)), float64((w - p.Width))))
-
-			cy = int64(math.Floor(((by + (bh / 2)) / factor))) - (p.Height / 2)
 			cy = int64(math.Min(math.Max(0, float64(cy)), float64((h - p.Height))))
 		// Crop from the right to left.
 		case "right":
@@ -342,6 +321,27 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	img.Size = int64(len(img.Data))
 
 	return &img, nil
+}
+
+// A map of supported MIME types against their magic numbers.
+var fileTypes = map[string][]byte{
+	"image/jpeg": []byte{0xff, 0xd8},
+	"image/png":  []byte{0x89, 0x50},
+	"image/gif":  []byte{0x47, 0x49},
+}
+
+// GetFileType detects and returns MIME type for file data in `data`, or returns
+// an "application/octet-stream" MIME type if file type could not be detected.
+func GetFileType(data []byte) string {
+	fileType := "application/octet-stream"
+
+	for t, sig := range fileTypes {
+		if bytes.Equal(data[:2], sig) {
+			fileType = t
+		}
+	}
+
+	return fileType
 }
 
 func init() {

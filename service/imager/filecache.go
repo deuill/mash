@@ -20,17 +20,32 @@ type FileCache struct {
 	sync.Mutex // Used for controlling concurrent access to item list and cache table.
 }
 
+// A file represents all information required for operating on a file in the context of the cache.
 type file struct {
 	fp   *os.File
 	size int64
 	key  string
 }
 
-func NewFileCache(path string, size int64) (*FileCache, error) {
+// A map of initialized caches, indexed under their path names. This is checked against every time
+// a new cache is initialized, and is used to provide exclusivity guarantees for the local cache.
+var caches map[string]*FileCache
+
+func NewFileCache(path string, quota int64) (*FileCache, error) {
+	// Check if a cache already exists for this path, and return initialized cache, if any.
+	if f, exists := caches[path]; exists {
+		// Update quota size for cache, if the new quota size is greater than the existing.
+		if quota == 0 || f.quota > 0 && f.quota < quota {
+			f.quota = quota
+		}
+
+		return f, nil
+	}
+
 	// If directory structure already exists, remove it first, but only if we have a size limit.
 	if fi, err := os.Stat(path); err != nil && !os.IsNotExist(err) {
 		return nil, err
-	} else if fi != nil && fi.IsDir() && size > 0 {
+	} else if fi != nil && fi.IsDir() && quota > 0 {
 		if err = os.RemoveAll(path); err != nil {
 			return nil, err
 		}
@@ -41,14 +56,14 @@ func NewFileCache(path string, size int64) (*FileCache, error) {
 		return nil, err
 	}
 
-	f := &FileCache{
+	caches[path] = &FileCache{
 		path:  path,
-		quota: size,
+		quota: quota,
 		order: list.New(),
 		cache: make(map[string]*list.Element),
 	}
 
-	return f, nil
+	return caches[path], nil
 }
 
 func (f *FileCache) Add(key string, value interface{}) {
@@ -152,4 +167,8 @@ func (f *FileCache) removeElement(el *list.Element) {
 	// Remove internal entries.
 	delete(f.cache, el.Value.(*file).key)
 	f.order.Remove(el)
+}
+
+func init() {
+	caches = make(map[string]*FileCache)
 }

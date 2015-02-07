@@ -70,3 +70,24 @@ func (s *Source) Get(path string) ([]byte, error) {
 
 	return data, nil
 }
+
+func (s *Source) Put(path string, data []byte, ctype string) error {
+	// Store data locally.
+	if s.cache != nil {
+		s.cache.Add(path, data)
+	}
+
+	// Store data in S3 bucket. The initial upload is placed with a `.tmp` prefix, and is renamed
+	// after it has uploaded successfully.
+	if err := s.bucket.Put(path+".tmp", data, ctype, "", s3.Options{}); err != nil {
+		return err
+	}
+
+	if _, err := s.bucket.PutCopy(path, "", s3.CopyOptions{}, s.bucket.Name+"/"+path+".tmp"); err != nil {
+		return err
+	}
+
+	s.bucket.Del(path + ".tmp")
+
+	return nil
+}
