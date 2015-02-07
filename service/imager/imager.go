@@ -153,18 +153,17 @@ func (i *Imager) Stop() error {
 
 // Package initialization, attaches options and registers service with Alfred.
 func init() {
-	// Fallback configuration directory is '/etc/alfred'.
-	confPath := "/etc"
+	var confPath string
 
 	// Attempt to set default configuration directory to user's home.
 	if u, _ := user.Current(); u != nil {
-		confPath = u.HomeDir + "/.config"
+		confPath = u.HomeDir + "/.config/alfred/"
 	}
 
 	fs := flag.NewFlagSet("imager", flag.ContinueOnError)
 	serv := &Imager{
 		CacheSize: fs.Int64("cachesize", 0, ""),
-		Config:    fs.String("config", confPath+"/alfred/imager.ini", ""),
+		Config:    fs.String("config", confPath+"imager.ini", ""),
 		sources:   make(map[string]*Source),
 	}
 
