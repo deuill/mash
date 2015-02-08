@@ -23,54 +23,54 @@ config=/etc/$name/config.ini
 lockfile=/var/lock/subsys/$name
 
 start() {
-    [ -x $program ] || exit 5
-    [ -f $config ]  || exit 6
+	[ -x $program ] || exit 5
+	[ -f $config ]  || exit 6
 
-    echo -n $"Starting $name: "
+	echo -n $"Starting $name: "
 
-    daemon "nohup $program >/dev/null 2>&1 &"
-    retval=$?
-    echo
+	daemon "nohup $program >/dev/null 2>&1 &"
+	retval=$?
+	echo
 
-    [ $retval -eq 0 ] && touch $lockfile
-    return $retval
+	[ $retval -eq 0 ] && touch $lockfile
+	return $retval
 }
 
 stop() {
-    echo -n $"Stopping $name: "
+	echo -n $"Stopping $name: "
 
-    killproc $name
-    retval=$?
-    echo
+	killproc $name
+	retval=$?
+	echo
 
-    [ $retval -eq 0 ] && rm -f $lockfile
-    return $retval
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
 }
 
 rh_status() {
-    status $name
+	status $name
 }
 
 # See how we were called.
 case "$1" in
-    start)
-        rh_status >/dev/null 2>&1 && exit 0
-        $1
-        ;;
-    stop)
-        rh_status >/dev/null 2>&1 && exit 0
-        $1
-        ;;
-    restart)
-        stop
-        start
-        ;;
-    status)
-        rh_status
-        retval=$?
-        ;;
-    *)
-        echo $"Usage: $0 {start|stop|restart|status|help}"
-        retval=2
+	start)
+		rh_status >/dev/null 2>&1 && exit 0
+		$1
+		;;
+	stop)
+		rh_status >/dev/null 2>&1 && exit 0
+		$1
+		;;
+	restart)
+		stop
+		start
+		;;
+	status)
+		rh_status
+		retval=$?
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart|status|help}"
+		retval=2
 esac
 exit $?
