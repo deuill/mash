@@ -15,17 +15,23 @@ import (
 
 // Entry point for Alfred, this sets up global configuration and starts internal services.
 func main() {
-	conf, err := globalconf.New("alfred")
+	// Allow one to override the default configuration file location using the ALFRED_CONFIG env
+	// variable. By definition, this variable exists outside of the configuration file and as such
+	// doesn't follow the same semantics as other configuration variables.
+	configFile := os.Getenv("ALFRED_CONFIG")
+	if configFile == "" {
+		configFile = "/etc/alfred/alfred.conf"
+	}
+
+	// Initialize configuration, reading from environment variables using a 'ALFRED_' prefix first,
+	// then moving to a static configuration file, usually located in '/etc/alfred/alfred.conf'.
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{configFile, "ALFRED_"})
 	if err != nil {
 		fmt.Println("Error loading configuration:", err)
 		os.Exit(1)
 	}
 
-	// Initialize configuration, reading from environment variables using a 'ALFRED_' prefix first,
-	// then moving to a static configuration file, usually located in ~/.config/alfred/config.ini.
-	conf.EnvPrefix = "ALFRED_"
 	conf.ParseAll()
-
 	fmt.Print("Starting server... ")
 
 	// Initialize HTTP and attached services.

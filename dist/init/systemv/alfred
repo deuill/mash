@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# alfred A simple task runner. 
+#
+# chkconfig:   - 90 10
+# processname: alfred
+# description: Alfred is a simple task runner.
+#
+### BEGIN INIT INFO
+# Provides:       alfred
+# Required-Start: $local_fs $remote_fs $network
+# Required-Stop:  $local_fs $remote_fs $network
+# Default-Start:  2 3 4 5
+# Default-Stop:   0 1 6
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+name=alfred
+program=/usr/bin/$name
+config=/etc/$name/config.ini
+lockfile=/var/lock/subsys/$name
+
+start() {
+    [ -x $program ] || exit 5
+    [ -f $config ]  || exit 6
+
+    echo -n $"Starting $name: "
+
+    daemon "nohup $program >/dev/null 2>&1 &"
+    retval=$?
+    echo
+
+    [ $retval -eq 0 ] && touch $lockfile
+    return $retval
+}
+
+stop() {
+    echo -n $"Stopping $name: "
+
+    killproc $name
+    retval=$?
+    echo
+
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+rh_status() {
+    status $name
+}
+
+# See how we were called.
+case "$1" in
+    start)
+        rh_status >/dev/null 2>&1 && exit 0
+        $1
+        ;;
+    stop)
+        rh_status >/dev/null 2>&1 && exit 0
+        $1
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    status)
+        rh_status
+        retval=$?
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|restart|status|help}"
+        retval=2
+esac
+exit $?

@@ -28,7 +28,16 @@ depend:
 install:
 	@echo -e "\033[1mInstalling '$(PROGRAM)' and data...\033[0m"
 
-	@install -s -Dm 755 .tmp/$(PROGRAM) $(DESTDIR)/usr/bin/$(PROGRAM)
+ifneq ($(wildcard /etc/systemd),)
+	@install -Dm 644 dist/init/systemd/$(PROGRAM).service $(DESTDIR)/usr/lib/systemd/system/$(PROGRAM).service
+else
+	@install -Dm 755 dist/init/systemv/$(PROGRAM) $(DESTDIR)/etc/init.d/$(PROGRAM)
+endif
+
+	@install -dm 0750 $(DESTDIR)/etc/$(PROGRAM)
+	@install -m 0640 dist/conf/* $(DESTDIR)/etc/$(PROGRAM)
+
+	@install -Dsm 0755 .tmp/$(PROGRAM) $(DESTDIR)/usr/bin/$(PROGRAM)
 
 package:
 	@echo -e "\033[1mBuilding package for '$(PROGRAM)'...\033[0m"

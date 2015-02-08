@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os/user"
 	"path"
 	"strings"
 
@@ -93,7 +92,7 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 }
 
 func (i *Imager) getSource(host string) *Source {
-	src := i.sources["default"]
+	src := i.sources[""]
 	if host != "" {
 		h, _, _ := net.SplitHostPort(host)
 		if s, ok := i.sources[h]; ok {
@@ -133,11 +132,7 @@ func (i *Imager) Start() error {
 			return err
 		}
 
-		if sect == "" {
-			i.sources["default"] = s
-		} else {
-			i.sources[sect] = s
-		}
+		i.sources[sect] = s
 
 		if err = s.InitCache("alfred/imager", *i.CacheSize); err != nil {
 			return err
@@ -153,17 +148,10 @@ func (i *Imager) Stop() error {
 
 // Package initialization, attaches options and registers service with Alfred.
 func init() {
-	var confPath string
-
-	// Attempt to set default configuration directory to user's home.
-	if u, _ := user.Current(); u != nil {
-		confPath = u.HomeDir + "/.config/alfred/"
-	}
-
 	fs := flag.NewFlagSet("imager", flag.ContinueOnError)
 	serv := &Imager{
 		CacheSize: fs.Int64("cachesize", 0, ""),
-		Config:    fs.String("config", confPath+"imager.ini", ""),
+		Config:    fs.String("config", "/etc/alfred/imager.conf", ""),
 		sources:   make(map[string]*Source),
 	}
 
