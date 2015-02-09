@@ -31,7 +31,7 @@ install:
 ifneq ($(wildcard /etc/systemd),)
 	@install -Dm 644 dist/init/systemd/$(PROGRAM).service $(DESTDIR)/usr/lib/systemd/system/$(PROGRAM).service
 else
-	@install -Dm 755 dist/init/systemv/$(PROGRAM) $(DESTDIR)/etc/init.d/$(PROGRAM)
+	@install -Dm 755 dist/init/systemv/$(PROGRAM) $(DESTDIR)/etc/rc.d/init.d/$(PROGRAM)
 	@install -Dm 644 dist/init/systemv/default $(DESTDIR)/etc/default/$(PROGRAM)
 endif
 
@@ -53,7 +53,7 @@ uninstall:
 ifneq ($(wildcard /etc/systemd),)
 	@rm -f $(DESTDIR)/usr/lib/systemd/system/$(PROGRAM).service
 else
-	@rm -f $(DESTDIR)/etc/init.d/$(PROGRAM) $(DESTDIR)/etc/default/$(PROGRAM)
+	@rm -f $(DESTDIR)/etc/rc.d/init.d/$(PROGRAM) $(DESTDIR)/etc/default/$(PROGRAM)
 endif
 
 	@rm -f $(DESTDIR)/usr/bin/$(PROGRAM)
