@@ -26,7 +26,7 @@ depend:
 	$(foreach srv, $(SERVICES), $(shell echo "import _ \"$(REPO)/$(srv)\""  >> services.go))
 
 install:
-	@echo -e "\033[1mInstalling '$(PROGRAM)' and data...\033[0m"
+	@echo -e "\033[1mInstalling '$(PROGRAM)'...\033[0m"
 
 ifneq ($(wildcard /etc/systemd),)
 	@install -Dm 644 dist/init/systemd/$(PROGRAM).service $(DESTDIR)/usr/lib/systemd/system/$(PROGRAM).service
@@ -49,7 +49,10 @@ package:
 uninstall:
 	@echo -e "\033[1mUninstalling '$(PROGRAM)'...\033[0m"
 
-	@rm -f $(DESTDIR)/usr/bin/$(PROGRAM)
+	@rm -f $(DESTDIR)/usr/bin/$(PROGRAM) $(DESTDIR)/etc/init.d/$(PROGRAM)
+	@mv -f $(DESTDIR)/etc/$(PROGRAM) $(DESTDIR)/etc/$(PROGRAM).save
+
+	@echo -e "\033[1mConfiguration files moved to '$(DESTDIR)/etc/$(PROGRAM).save'.\033[0m"
 
 clean:
 	@echo -e "\033[1mCleaning '$(PROGRAM)'...\033[0m"

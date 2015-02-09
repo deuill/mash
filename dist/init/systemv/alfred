@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# alfred A simple task runner. 
+# alfred A simple task runner.
 #
 # chkconfig:   - 90 10
 # processname: alfred
@@ -19,7 +19,7 @@
 
 name=alfred
 program=/usr/bin/$name
-config=/etc/$name/config.ini
+config=/etc/$name/$name.conf
 lockfile=/var/lock/subsys/$name
 
 start() {
@@ -39,7 +39,7 @@ start() {
 stop() {
 	echo -n $"Stopping $name: "
 
-	killproc $name
+	killproc $name -2
 	retval=$?
 	echo
 
@@ -58,7 +58,7 @@ case "$1" in
 		$1
 		;;
 	stop)
-		rh_status >/dev/null 2>&1 && exit 0
+		rh_status >/dev/null 2>&1 || exit 0
 		$1
 		;;
 	restart)
