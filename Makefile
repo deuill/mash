@@ -45,7 +45,7 @@ package:
 
 	@mkdir -p .tmp/package
 	@make DESTDIR=.tmp/package install
-	@tar -cJf $(PROGRAM)-$(VERSION).tar.xz -C .tmp/package .
+	@fakeroot -- tar -cJf $(PROGRAM)-$(VERSION).tar.xz -C .tmp/package .
 
 uninstall:
 	@echo -e "\033[1mUninstalling '$(PROGRAM)'...\033[0m"
