@@ -32,6 +32,7 @@ ifneq ($(wildcard /etc/systemd),)
 	@install -Dm 644 dist/init/systemd/$(PROGRAM).service $(DESTDIR)/usr/lib/systemd/system/$(PROGRAM).service
 else
 	@install -Dm 755 dist/init/systemv/$(PROGRAM) $(DESTDIR)/etc/init.d/$(PROGRAM)
+	@install -Dm 644 dist/init/systemv/default $(DESTDIR)/etc/default/$(PROGRAM)
 endif
 
 	@install -dm 0750 $(DESTDIR)/etc/$(PROGRAM)

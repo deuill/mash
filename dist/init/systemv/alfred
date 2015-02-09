@@ -14,13 +14,14 @@
 # Default-Stop:   0 1 6
 ### END INIT INFO
 
-# Source function library.
-. /etc/rc.d/init.d/functions
-
 name=alfred
 program=/usr/bin/$name
 config=/etc/$name/$name.conf
 lockfile=/var/lock/subsys/$name
+
+# Source function library and configuration.
+. /etc/rc.d/init.d/functions
+. /etc/default/$name
 
 start() {
 	[ -x $program ] || exit 5
@@ -28,7 +29,7 @@ start() {
 
 	echo -n $"Starting $name: "
 
-	daemon "nohup $program >/dev/null 2>&1 &"
+	daemon --user $USER "nohup $program >/dev/null 2>&1 &"
 	retval=$?
 	echo
 
