@@ -50,7 +50,13 @@ package:
 uninstall:
 	@echo -e "\033[1mUninstalling '$(PROGRAM)'...\033[0m"
 
-	@rm -f $(DESTDIR)/usr/bin/$(PROGRAM) $(DESTDIR)/etc/init.d/$(PROGRAM)
+ifneq ($(wildcard /etc/systemd),)
+	@rm -f $(DESTDIR)/usr/lib/systemd/system/$(PROGRAM).service
+else
+	@rm -f $(DESTDIR)/etc/init.d/$(PROGRAM) $(DESTDIR)/etc/default/$(PROGRAM)
+endif
+
+	@rm -f $(DESTDIR)/usr/bin/$(PROGRAM)
 	@mv -f $(DESTDIR)/etc/$(PROGRAM) $(DESTDIR)/etc/$(PROGRAM).save
 
 	@echo -e "\033[1mConfiguration files moved to '$(DESTDIR)/etc/$(PROGRAM).save'.\033[0m"
