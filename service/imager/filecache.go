@@ -34,7 +34,7 @@ var caches map[string]*FileCache
 func NewFileCache(path string, quota int64) (*FileCache, error) {
 	// Check if a cache already exists for this path, and return initialized cache, if any.
 	if f, exists := caches[path]; exists {
-		// Update quota size for cache, if the new quota size is greater than the existing.
+		// Update quota size for cache, if the new quota size is greater than the existing one.
 		if quota == 0 || f.quota > 0 && f.quota < quota {
 			f.quota = quota
 		}
@@ -76,6 +76,11 @@ func (f *FileCache) Add(key string, value interface{}) {
 		return
 	}
 
+	// Do not store data whose size is equal to or larger than the quota size.
+	if int64(len(data)) >= f.quota {
+		return
+	}
+
 	f.Lock()
 	defer f.Unlock()
 
@@ -102,7 +107,7 @@ func (f *FileCache) Add(key string, value interface{}) {
 	}
 
 	// If writing the file would bring us above quota, remove oldest files as required.
-	// NOTE: If the call to write the data below fails, any files removed WILL be lost.
+	// NOTE: If the call to write the data below fails, any files removed will STILL be removed.
 	for f.quota > 0 && f.usage+el.Value.(*file).size > f.quota {
 		f.RemoveOldest()
 	}
