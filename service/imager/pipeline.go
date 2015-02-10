@@ -177,14 +177,13 @@ func (p *Pipeline) Process(data []byte) (*Image, error) {
 			return nil, fmt.Errorf("unable to encode image: %s", err)
 		}
 
-		img.Data = b.Bytes()
-		img.Size = int64(b.Len())
+		img := &Image{b.Bytes(), int64(b.Len()), imgType}
 		return img, nil
 	case "application/octet-stream":
 		return nil, fmt.Errorf("unknown image type, cannot process")
 	}
 
-	img := Image{data, int64(len(data)), imgType}
+	img := &Image{data, int64(len(data)), imgType}
 	vipsImg := C.Vips_image_init()
 
 	defer C.vips_error_clear()
