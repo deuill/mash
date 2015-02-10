@@ -7,6 +7,10 @@ import "C"
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/gif"
+	"image/jpeg"
 	"math"
 	"reflect"
 	"runtime"
@@ -18,12 +22,13 @@ import (
 // A Pipeline represents all data required for converting an image from its original format to the
 // processed result.
 type Pipeline struct {
-	Width   int64     `default:"0"`
-	Height  int64     `default:"0"`
-	Quality int64     `default:"75" min:"1" max:"100"`
-	Fit     string    `default:"crop"`
-	Crop    string    `default:"top"`
-	Focus   []float64 `default:"0:0:0:0" delim:":"`
+	Width   int64     `default:"0"`                    // Image width. If 0, calculate from height.
+	Height  int64     `default:"0"`                    // Image height. If 0, calculate from width.
+	Quality int64     `default:"75" min:"1" max:"100"` // The quality of the image, for JPEG output.
+	Fit     string    `default:"crop"`                 // The fit mode. Values: "clip" and "crop".
+	Crop    string    `default:"top"`                  // Cropping strategy. Values: "top", "bottom", "left", "right" and "focus".
+	Focus   []float64 `default:"0:0:0:0" delim:":"`    // Focus bounding box. Values: "x", "y", "w" and "h".
+	Frame   bool      `default:"false"`                // If true, only return first frame of animated GIF.
 }
 
 func NewPipeline() (*Pipeline, error) {
@@ -88,6 +93,13 @@ func (p *Pipeline) SetString(field, value string) error {
 		}
 
 		f.SetFloat(v)
+	case f.Kind() == reflect.Bool:
+		var v bool
+		if value == "true" {
+			v = true
+		}
+
+		f.SetBool(v)
 	case f.Kind() == reflect.String:
 		f.SetString(value)
 	default:
@@ -105,13 +117,74 @@ type Image struct {
 	Type string // The image MIME type.
 }
 
-func (p *Pipeline) Process(buf []byte) (*Image, error) {
-	imgType := GetFileType(buf)
-	if imgType == "application/octet-stream" {
+func (p *Pipeline) Process(data []byte) (*Image, error) {
+	imgType := GetFileType(data)
+
+	switch imgType {
+	// GIF images are not supported by VIPS directly, and as such must be handled as a special case.
+	// This is done by extracting the frames in a GIF, processing them as PNG images, and converting
+	// back to a GIF once VIPS is done processing each frame individually.
+	case "image/gif":
+		buf := bytes.NewBuffer(data)
+		gifdec, err := gif.DecodeAll(buf)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode image: %s", err)
+		}
+
+		if p.Frame {
+			gifdec.Image = gifdec.Image[:1]
+		}
+
+		frames := make([]*Image, len(gifdec.Image))
+
+		// Convert and process available frames in GIF one-by-one.
+		for i, gifimg := range gifdec.Image {
+			b := new(bytes.Buffer)
+			if err = jpeg.Encode(b, gifimg, &jpeg.Options{Quality: int(p.Quality)}); err != nil {
+				return nil, fmt.Errorf("unable to decode image: %s", err)
+			}
+
+			im, err := p.Process(b.Bytes())
+			if err != nil {
+				return nil, err
+			}
+
+			frames[i] = im
+		}
+
+		// Return first frame if we're in "frame" mode.
+		if p.Frame {
+			return frames[0], nil
+		}
+
+		// Otherwise, process each frame and rebuild GIF file.
+		gifenc := &gif.GIF{make([]*image.Paletted, len(frames)), gifdec.Delay, gifdec.LoopCount}
+		for i, frm := range frames {
+			b := bytes.NewBuffer(frm.Data)
+			im, err := jpeg.Decode(b)
+			if err != nil {
+				return nil, fmt.Errorf("unable to decode image: %s", err)
+			}
+
+			pimg := image.NewPaletted(im.Bounds(), gifdec.Image[0].Palette)
+			draw.Draw(pimg, im.Bounds(), im, image.Point{0, 0}, 0)
+			gifenc.Image[i] = pimg
+		}
+
+		// Encode final GIF file.
+		b := new(bytes.Buffer)
+		if err = gif.EncodeAll(b, gifenc); err != nil {
+			return nil, fmt.Errorf("unable to encode image: %s", err)
+		}
+
+		img.Data = b.Bytes()
+		img.Size = int64(b.Len())
+		return img, nil
+	case "application/octet-stream":
 		return nil, fmt.Errorf("unknown image type, cannot process")
 	}
 
-	img := Image{buf, int64(len(buf)), imgType}
+	img := Image{data, int64(len(data)), imgType}
 	vipsImg := C.Vips_image_init()
 
 	defer C.vips_error_clear()
@@ -136,7 +209,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 
 	// If the pipeline requests an enlarged image, or dimensions equal to original image, return original.
 	if (p.Width > imgWidth || p.Height > imgHeight) || (p.Width == imgWidth && p.Height == imgHeight) {
-		return &img, nil
+		return img, nil
 	}
 
 	// Calculate resize factor based on pipeline parameters.
@@ -162,7 +235,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 		p.Width = int64(math.Floor(float64(imgWidth) / factor))
 	// No change requested, return original image.
 	default:
-		return &img, nil
+		return img, nil
 	}
 
 	// We resize images in a two-step operation, first shrinking the image by an integer factor,
@@ -320,7 +393,7 @@ func (p *Pipeline) Process(buf []byte) (*Image, error) {
 	img.Data = C.GoBytes(ptr, C.int(length))
 	img.Size = int64(len(img.Data))
 
-	return &img, nil
+	return img, nil
 }
 
 // A map of supported MIME types against their magic numbers.
