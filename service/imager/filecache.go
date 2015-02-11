@@ -77,7 +77,7 @@ func (f *FileCache) Add(key string, value interface{}) {
 	}
 
 	// Do not store data whose size is equal to or larger than the quota size.
-	if int64(len(data)) >= f.quota {
+	if f.quota > 0 && int64(len(data)) >= f.quota {
 		return
 	}
 
