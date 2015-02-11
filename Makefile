@@ -39,6 +39,7 @@ endif
 	@install -m 0640 dist/conf/* $(DESTDIR)/etc/$(PROGRAM)
 
 	@install -Dsm 0755 .tmp/$(PROGRAM) $(DESTDIR)/usr/bin/$(PROGRAM)
+	@setcap 'cap_net_bind_service=+ep' $(DESTDIR)/usr/bin/$(PROGRAM)
 
 package:
 	@echo -e "\033[1mBuilding package for '$(PROGRAM)'...\033[0m"
