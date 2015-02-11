@@ -1,15 +1,15 @@
 # Makefile for Alfred. Run 'make' to build locally, 'make install' to install binaries and other
 # data, 'make package' to prepare a redistributable package.
-# 
+#
 # User-defined build options.
-# 
+#
 COMPILER = gc
 PROGRAM  = alfred
-VERSION  = 1.0.0
 REPO     = github.com/Hearst-Digital/alfred
 
 # No editing from here on!
 
+VERSION  = $(shell git describe --tags | cut -c3-)
 SERVICES = $(shell find service/* -maxdepth 1 -type d)
 
 .PHONY: $(PROGRAM)
