@@ -5,27 +5,32 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"path"
 	"strings"
 
 	// Internal packages
 	"github.com/Hearst-Digital/alfred/service"
-
-	// Third-party packages
-	ini "github.com/rakyll/goini"
 )
 
 // The Imager service, containing state shared between methods.
 type Imager struct {
-	CacheSize *int64  // The image cache size maximum, in bytes.
-	Config    *string // Path to imager.ini file, used for defining sources and their options.
+	Quota       *int64  // The image cache size maximum, in bytes.
+	S3Region    *string // S3 region to use for bucket.
+	S3Bucket    *string // S3 bucket to use for image access.
+	S3AccessKey *string // Access key to use for bucket. If empty, access will be attempted with IAM.
+	S3SecretKey *string // Secret key to use for bucket. If empty, access will be attempted with IAM.
 
-	sources map[string]*Source // A map of sources, indexed under their name.
+	sources map[string]*Source // A map of sources, indexed under their region and bucket name.
 }
 
-func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, error) {
+func (m *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, error) {
+	// Get source for this request, pulling the region and bucket names from request headers.
+	src, err := m.getSource(r.Header.Get("X-S3-Region"), r.Header.Get("X-S3-Bucket"))
+	if err != nil {
+		return nil, err
+	}
+
 	// Split request to its significant parts.
 	fields := strings.SplitN(r.URL.Path, "/", 5)
 	if len(fields) < 5 || fields[4] == "" {
@@ -36,10 +41,6 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 
 	dir, file := path.Split(filepath)
 	procpath := path.Join(dir, params, file)
-
-	// Select source to fetch from and push to depending on the request Host field.
-	// If the field is empty or invalid, the default source is used instead.
-	src := i.getSource(r.Host)
 
 	// Fetch existing processed file, if any.
 	if data, _ := src.Get(procpath); data != nil {
@@ -91,16 +92,30 @@ func (i *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 	return nil, nil
 }
 
-func (i *Imager) getSource(host string) *Source {
-	src := i.sources[""]
-	if host != "" {
-		h, _, _ := net.SplitHostPort(host)
-		if s, ok := i.sources[h]; ok {
-			src = s
-		}
+func (m *Imager) getSource(region, bucket string) (*Source, error) {
+	var err error
+	var access, secret string
+
+	// Fall back to default values if either region name or bucket name is empty.
+	if region == "" || bucket == "" {
+		access, secret = *m.S3AccessKey, *m.S3SecretKey
+		region, bucket = *m.S3Region, *m.S3Bucket
 	}
 
-	return src
+	key := region + "/" + bucket
+
+	// Check for existing source, or initialize new source for specified region and bucket.
+	src, exists := m.sources[key]
+	if !exists {
+		if src, err = NewSource(region, bucket, access, secret); err != nil {
+			return nil, err
+		}
+
+		src.InitCache("alfred/imager", *m.Quota)
+		m.sources[key] = src
+	}
+
+	return m.sources[key], nil
 }
 
 func writeResponse(data []byte, size int64, ctype string, w http.ResponseWriter) {
@@ -111,38 +126,14 @@ func writeResponse(data []byte, size int64, ctype string, w http.ResponseWriter)
 	w.Write(data)
 }
 
-func (i *Imager) Start() error {
+func (m *Imager) Start() error {
 	// Register handler methods under their names.
-	service.RegisterHandler("imager", "process", i.Process)
-
-	// Load Imager configuration file and initialize sources.
-	dict, err := ini.Load(*i.Config)
-	if err != nil {
-		return err
-	}
-
-	for _, sect := range dict.GetSections() {
-		region, _ := dict.GetString(sect, "s3_region")
-		bucket, _ := dict.GetString(sect, "s3_bucket")
-		access, _ := dict.GetString(sect, "s3_access_key")
-		secret, _ := dict.GetString(sect, "s3_secret_key")
-
-		s, err := NewSource(region, bucket, access, secret)
-		if err != nil {
-			return err
-		}
-
-		i.sources[sect] = s
-
-		if err = s.InitCache("alfred/imager", *i.CacheSize); err != nil {
-			return err
-		}
-	}
+	service.RegisterHandler("imager", "process", m.Process)
 
 	return nil
 }
 
-func (i *Imager) Stop() error {
+func (m *Imager) Stop() error {
 	return nil
 }
 
@@ -150,9 +141,12 @@ func (i *Imager) Stop() error {
 func init() {
 	fs := flag.NewFlagSet("imager", flag.ContinueOnError)
 	serv := &Imager{
-		CacheSize: fs.Int64("cachesize", 0, ""),
-		Config:    fs.String("config", "/etc/alfred/imager.conf", ""),
-		sources:   make(map[string]*Source),
+		Quota:       fs.Int64("quota", 0, ""),
+		S3Region:    fs.String("s3-region", "", ""),
+		S3Bucket:    fs.String("s3-bucket", "", ""),
+		S3AccessKey: fs.String("s3-access-key", "", ""),
+		S3SecretKey: fs.String("s3-secret-key", "", ""),
+		sources:     make(map[string]*Source),
 	}
 
 	service.Register("imager", serv, fs)

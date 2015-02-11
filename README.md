@@ -42,6 +42,3 @@ port = 8080
 
 set as a persistent value in the local file. Environment variables override file variables, which in
 turn override defaults.
-
-Individual services may define additional configuration files to be loaded, each with their own
-semantics. Please refer to the README files in the respective services' folders for more information.
