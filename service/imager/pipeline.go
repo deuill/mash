@@ -122,7 +122,7 @@ func (p *Pipeline) Process(data []byte) (*Image, error) {
 
 	switch imgType {
 	// GIF images are not supported by VIPS directly, and as such must be handled as a special case.
-	// This is done by extracting the frames in a GIF, processing them as PNG images, and converting
+	// This is done by extracting the frames in a GIF, processing them as JPEG images, and converting
 	// back to a GIF once VIPS is done processing each frame individually.
 	case "image/gif":
 		buf := bytes.NewBuffer(data)
