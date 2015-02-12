@@ -326,7 +326,7 @@ func (p *Pipeline) Process(data []byte) (*Image, error) {
 			}
 
 			bx, bw := p.Focus[0], p.Focus[2]
-			by, bh := p.Focus[1], p.Focus[2]
+			by, bh := p.Focus[1], p.Focus[3]
 
 			// Recalculate bounding box position and dimensions based on the resize factor.
 			factor = math.Max(float64((imgWidth / w)), float64((imgHeight / h)))
