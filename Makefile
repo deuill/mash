@@ -39,7 +39,6 @@ endif
 	@install -m 0640 dist/conf/* $(DESTDIR)/etc/$(PROGRAM)
 
 	@install -Dsm 0755 .tmp/$(PROGRAM) $(DESTDIR)/usr/bin/$(PROGRAM)
-	@setcap 'cap_net_bind_service=+ep' $(DESTDIR)/usr/bin/$(PROGRAM)
 
 package:
 	@echo -e "\033[1mBuilding package for '$(PROGRAM)'...\033[0m"
@@ -47,6 +46,13 @@ package:
 	@mkdir -p .tmp/package
 	@make DESTDIR=.tmp/package install
 	@fakeroot -- tar -cJf $(PROGRAM)-$(VERSION).tar.xz -C .tmp/package .
+
+rpm:
+	@echo -e "\033[1mBuilding RPM package for '$(PROGRAM)'...\033[0m"
+
+	@mkdir -p .tmp/package
+	@make DESTDIR=.tmp/package install
+	@fpm -s dir -t rpm -n $(PROGRAM) -v $(VERSION) .tmp/package
 
 uninstall:
 	@echo -e "\033[1mUninstalling '$(PROGRAM)'...\033[0m"
