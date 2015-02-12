@@ -22,7 +22,6 @@ type FileCache struct {
 
 // A file represents all information required for operating on a file in the context of the cache.
 type file struct {
-	fp   *os.File
 	size int64
 	key  string
 }
@@ -84,42 +83,35 @@ func (f *FileCache) Add(key string, value interface{}) {
 	f.Lock()
 	defer f.Unlock()
 
-	// If entry already exists, move to front and return. Otherwise, add a new element in front.
+	// If entry already exists, move to front and return.
 	if el, ok = f.cache[key]; ok {
 		f.order.MoveToFront(el)
 		return
-	} else {
-		p := path.Join(f.path, key)
-		if err := os.MkdirAll(path.Dir(p), 0755); err != nil {
-			return
-		}
-
-		fp, err := os.Create(p)
-		if err != nil {
-			return
-		}
-
-		el = f.order.PushFront(&file{
-			fp:   fp,
-			size: int64(len(data)),
-			key:  key,
-		})
 	}
 
+	// Create path heirarchy for file.
+	p := path.Join(f.path, key)
+	if err := os.MkdirAll(path.Dir(p), 0755); err != nil {
+		return
+	}
+
+	// Push file pointer to front of file list.
+	el = f.order.PushFront(&file{
+		size: int64(len(data)),
+		key:  key,
+	})
+
 	// If writing the file would bring us above quota, remove oldest files as required.
-	// NOTE: If the call to write the data below fails, any files removed will STILL be removed.
+	// NOTE: If the call to write the data below fails, affected files will STILL be removed.
 	for f.quota > 0 && f.usage+el.Value.(*file).size > f.quota {
 		f.RemoveOldest()
 	}
 
-	// Write data to file corresponding to key.
-	_, err := el.Value.(*file).fp.Write(data)
-	if err != nil {
+	if err := ioutil.WriteFile(p, data, 0644); err != nil {
 		f.order.Remove(el)
 		return
 	}
 
-	el.Value.(*file).fp.Seek(0, 0)
 	f.usage += el.Value.(*file).size
 	f.cache[key] = el
 }
@@ -130,13 +122,12 @@ func (f *FileCache) Get(key string) interface{} {
 		f.Lock()
 		defer f.Unlock()
 
-		f.order.MoveToFront(el)
+		if buf, err := ioutil.ReadFile(path.Join(f.path, key)); err == nil {
+			f.order.MoveToFront(el)
+			return buf
+		}
 
-		buf := make([]byte, el.Value.(*file).size)
-		el.Value.(*file).fp.Read(buf)
-		el.Value.(*file).fp.Seek(0, 0)
-
-		return buf
+		return nil
 	}
 
 	// There is a possibility that the file exists on disk but is not yet tracked. If so, add it.
@@ -164,12 +155,11 @@ func (f *FileCache) removeElement(el *list.Element) {
 	f.Lock()
 	defer f.Unlock()
 
-	// Remove file, close file descriptor and remove filesize from total usage.
-	os.Remove(el.Value.(*file).fp.Name())
-	el.Value.(*file).fp.Close()
+	// Remove file and subtract file size from total usage.
+	os.Remove(path.Join(f.path, el.Value.(*file).key))
 	f.usage -= el.Value.(*file).size
 
-	// Remove internal entries.
+	// Remove internal book-keeping entries.
 	delete(f.cache, el.Value.(*file).key)
 	f.order.Remove(el)
 }
