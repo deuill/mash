@@ -33,7 +33,7 @@ type Helloworld struct {
 	Name *string
 }
 
-func (h *Helloworld) Hello(r *http.Request, w http.ResponseWriter) (interface{}, error) {
+func (h *Helloworld) Hello(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
 	if *h.Name == "" {
 		return "", fmt.Errorf("Name is empty!")
 	}
@@ -41,7 +41,7 @@ func (h *Helloworld) Hello(r *http.Request, w http.ResponseWriter) (interface{},
 	return "Hello " + *h.Name + "!", nil
 }
 
-func (h *Helloworld) Goodbye(r *http.Request, w http.ResponseWriter) (interface{}, error) {
+func (h *Helloworld) Goodbye(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
 	if *h.Name == "" {
 		return "", fmt.Errorf("Name is empty!")
 	}
@@ -49,24 +49,16 @@ func (h *Helloworld) Goodbye(r *http.Request, w http.ResponseWriter) (interface{
 	return "Goodbye " + *h.Name + "!", nil
 }
 
-func (h *Helloworld) Start() error {
-	service.RegisterHandler("helloworld", "hello", h.Hello)
-	service.RegisterHandler("helloworld", "goodbye", h.Goodbye)
-
-	return nil
-}
-
-func (h *Helloworld) Stop() error {
-	return nil
-}
-
 func init() {
-	fs := flag.NewFlagSet("helloworld", flag.ContinueOnError)
+	flags := flag.NewFlagSet("helloworld", flag.ContinueOnError)
 	serv := &Helloworld{
-		Name: fs.String("name", "World", ""),
+		Name: flags.String("name", "World", ""),
 	}
 
-	service.Register("helloworld", serv, fs)
+	service.Register("helloworld", flags, []service.Handler{
+		{"GET", "/hello", serv.Hello},
+		{"GET", "/goodbye", serv.Goodbye},
+	})
 }
 ```
 
@@ -77,37 +69,16 @@ type ServiceName interface{}
 ```
 
 The method receiver (in this case, the `Helloworld` struct) can be any valid receiver type, including
-an empty structure. The receiver is defined in the service host as:
-
-```go
-type Service interface {
-	Start() error
-	Stop() error
-}
-```
-
-And any valid method receiver has to implement these two methods _at least_.
-
-```go
-func (s *ServiceName) Start() error
-```
-
-```go
-func (s *ServiceName) Stop() error
-```
-
-These two methods implement the `Service` interface defined in the service host. Method `Start`
-executes once when Alfred starts up, before the internal HTTP service is initialized, and most
-commonly contains calls to `service.RegisterHandler()`, used for attaching specific methods to
-the service host (which also attaches them as URL endpoints, as explained below).
+an empty structure. This receiver is then used to register any attached methods to the service host,
+as explained below.
 
 ```go
 func init()
 ```
 
 This method contains, minimally, a call to `service.Register()` for attaching the method receiver
-to the service host. Although technically possible, it is not recommended to attach more than one
-method receiver per package.
+and any exported methods to the service host. Although technically possible, it is not recommended
+to attach more than one method receiver per package.
 
 Any command-line options are also declared here, and become available under the global configuration
 scheme.
@@ -117,9 +88,9 @@ scheme.
 After all registered services complete their initialization routine, the service host initializes its
 internal HTTP server and begins accepting requests on a specified TCP port (default is 6116).
 
-Methods registered using `service.RegisterHandler()` are made available under the URL scheme of
-"/servicename/methodname/", where `servicename` and `methodname` correspond to the first and
-second parameters accepted by `service.RegisterHandler()`.
+Methods registered using `service.Register` are made available under their service name, followed by
+the path specified in their Handler type. Paths are matched according to rules specified in the
+[httprouter Documentation](https://github.com/julienschmidt/httprouter).
 
 So, for the example calls above, you would get the following URL endpoints, for a local server running
 with the default options:
@@ -132,14 +103,13 @@ http://localhost:6116/helloworld/goodbye
 Any method registered in this way is expected to correspond to the following declaration:
 
 ```go
-func (h *ServiceName) MethodName(r *http.Request, w http.ResponseWriter) (interface{}, error)
+func (h *ServiceName) MethodName(http.ResponseWriter, *http.Request, service.Params) (interface{}, error)
 ```
 
-Methods are expected to handle any arguments bound to the HTTP request on their own via the
-`http.Request` structure. However, a method returning a value or error will have those types
-returned as JSON documents to the caller. If more control over the response is needed, the
-`http.ResponseWriter` type is also available.
+Methods can handle any arguments bound to the HTTP request via the `service.Params` type, which
+allows you to fetch named parameters via the `Get` method, or on their own using the `http.Request`
+type.
 
-Use of this type and returning of values to be serialized is mutually exclusive, so choose whichever
-fits best for you and return `nil` for the interface{} type if a method is to use `http.ResponseWriter`
-directly.
+Returning data to the user can be accomplished by returning any non-`nil` data, in which case
+the values are encoded as JSON before being returned, or manually through the `http.ResponseWriter`
+type, in which case the method is expected to return `nil` for the `interface{}` type.

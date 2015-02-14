@@ -9,58 +9,62 @@ import (
 	"time"
 
 	// Third-party packages
+	"github.com/julienschmidt/httprouter"
 	"github.com/rakyll/globalconf"
 )
 
-type Service interface {
-	Start() error // Start initializes service.
-	Stop() error  // Stop shuts the service down, performing any cleanup required.
+var (
+	port     *string            // The port number on which the internal HTTP service will listen.
+	services map[string]bool    // A map of services indexed under their name.
+	router   *httprouter.Router // The default router for all incoming requests.
+)
+
+// A HandleFunc represents the default signature for registered methods attached to services.
+type HandleFunc func(http.ResponseWriter, *http.Request, Params) (interface{}, error)
+
+// Handler represents a registered handler method attached to Alfred.
+type Handler struct {
+	Method string     // The HTTP method handler is attached under, e.g. GET, POST, DELETE etc.
+	Path   string     // The request path to bind handler against. Supports parameter bindings.
+	Handle HandleFunc // The method to use for this handler.
 }
 
-// A map of services indexed under their name.
-var services map[string]Service
+// A proxy type for parameters passed to handlers.
+type Params httprouter.Params
 
-// A handler represents the default signature for registered methods attached to services.
-type handler func(r *http.Request, w http.ResponseWriter) (interface{}, error)
+// A proxy method for the httprouter.Params.ByName method.
+func (p Params) Get(name string) string {
+	return httprouter.Params(p).ByName(name)
+}
 
-// Register service for use with Alfred. Services are attached to Alfred under the name passed.
-// Attaching multiple services under the same name is prohibited, and will result in an error being
-// thrown.
-//
-// You may also pass a flag.Flagset for options registered globally, in which case they will
-// become available to the environment according to the naming conventions used by each configuration
-// method.
-func Register(name string, serv Service, fs *flag.FlagSet) error {
+// Register service for use with Alfred.
+func Register(name string, flags *flag.FlagSet, handlers []Handler) error {
 	if _, exists := services[name]; exists {
 		return fmt.Errorf("Service '%s' already exists, refusing to overwrite", name)
 	}
 
-	if fs != nil {
-		globalconf.Register(name, fs)
+	services[name] = true
+
+	if flags != nil {
+		globalconf.Register(name, flags)
 	}
 
-	services[name] = serv
+	for _, h := range handlers {
+		hv := h.Handle
+		handle := func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+			if result, err := hv(w, r, Params(p)); err != nil {
+				writeResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			} else if result != nil {
+				writeResponse(w, http.StatusOK, result)
+			}
+		}
+
+		path := "/" + name + h.Path
+		router.Handle(h.Method, path, handle)
+	}
 
 	return nil
-}
-
-// RegisterHandler attaches handler methods owned by services to specific URL patterns.
-func RegisterHandler(serv, method string, h handler) {
-	http.HandleFunc("/"+serv+"/"+method+"/", func(w http.ResponseWriter, r *http.Request) {
-		result, err := h(r, w)
-		if err != nil {
-			writeResponse(w, http.StatusBadRequest, map[string]string{
-				"error": err.Error(),
-			})
-
-			return
-		}
-
-		// Only attempt to write a response if method returned a value to write.
-		if result != nil {
-			writeResponse(w, http.StatusOK, result)
-		}
-	})
 }
 
 // Encode response in JSON and write to connection.
@@ -79,24 +83,14 @@ func writeResponse(w http.ResponseWriter, code int, data interface{}) {
 	return
 }
 
-// The port number on which the internal HTTP service will listen.
-var port *string
-
 // Initialize services for Alfred, including internal HTTP service.
 func Init() error {
 	var err error
 
-	// Start services registered on Alfred.
-	for name, s := range services {
-		if err = s.Start(); err != nil {
-			return fmt.Errorf("[%s]: %s", name, err)
-		}
-	}
-
 	// Start HTTP server, sending any errors back to the 'result' channel.
 	result := make(chan error)
 	go func() {
-		result <- http.ListenAndServe(":"+*port, nil)
+		result <- http.ListenAndServe(":"+*port, router)
 	}()
 
 	// Allow for a 500 millisecond timeout before this function returns, in order to catch any
@@ -118,28 +112,10 @@ func Init() error {
 	}
 }
 
-// Shut down all registered services, by calling each service's Stop method. Collects and returns
-// a slice of errors for each Stop method returning one, or nil if no errors occured.
-func Shutdown() []error {
-	var err error
-	var errors []error
-
-	for name, s := range services {
-		if err = s.Stop(); err != nil {
-			errors = append(errors, fmt.Errorf("[%s]: %s", name, err))
-		}
-	}
-
-	if len(errors) > 0 {
-		return errors
-	}
-
-	return nil
-}
-
 // Initialize internal resources and configuration variables.
 func init() {
-	services = make(map[string]Service)
+	router = httprouter.New()
+	services = make(map[string]bool)
 
 	// Define configuration variables used for the HTTP service.
 	fs := flag.NewFlagSet("http", flag.ContinueOnError)

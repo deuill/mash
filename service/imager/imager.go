@@ -24,26 +24,24 @@ type Imager struct {
 	sources map[string]*Source // A map of sources, indexed under their region and bucket name.
 }
 
-func (m *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, error) {
+func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
 	// Get source for this request, pulling the region and bucket names from request headers.
 	src, err := m.getSource(r.Header.Get("X-S3-Region"), r.Header.Get("X-S3-Bucket"))
 	if err != nil {
 		return nil, err
 	}
 
-	// Split request to its significant parts.
-	fields := strings.SplitN(r.URL.Path, "/", 5)
-	if len(fields) < 5 || fields[4] == "" {
+	params, imgPath := p.Get("params"), p.Get("image")
+
+	if imgPath == "" {
 		return nil, fmt.Errorf("image URL is unset or empty")
 	}
 
-	params, filepath := fields[3], fields[4]
-
-	dir, file := path.Split(filepath)
-	procpath := path.Join(dir, params, file)
+	dir, file := path.Split(imgPath)
+	procPath := path.Join(dir, params, file)
 
 	// Fetch existing processed file, if any.
-	if data, _ := src.Get(procpath); data != nil {
+	if data, _ := src.Get(procPath); data != nil {
 		writeResponse(data, int64(len(data)), GetFileType(data), w)
 		return nil, nil
 	}
@@ -72,7 +70,7 @@ func (m *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 	}
 
 	// Fetch original image from remote server or local cache.
-	origImg, err := src.Get(filepath)
+	origImg, err := src.Get(imgPath)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +82,7 @@ func (m *Imager) Process(r *http.Request, w http.ResponseWriter) (interface{}, e
 	}
 
 	// Store image in local cache and upload to S3 bucket asynchronously.
-	go src.Put(procpath, img.Data, img.Type)
+	go src.Put(procPath, img.Data, img.Type)
 
 	// Write response back to user.
 	writeResponse(img.Data, img.Size, img.Type, w)
@@ -126,28 +124,20 @@ func writeResponse(data []byte, size int64, ctype string, w http.ResponseWriter)
 	w.Write(data)
 }
 
-func (m *Imager) Start() error {
-	// Register handler methods under their names.
-	service.RegisterHandler("imager", "process", m.Process)
-
-	return nil
-}
-
-func (m *Imager) Stop() error {
-	return nil
-}
-
 // Package initialization, attaches options and registers service with Alfred.
 func init() {
-	fs := flag.NewFlagSet("imager", flag.ContinueOnError)
+	flags := flag.NewFlagSet("imager", flag.ContinueOnError)
 	serv := &Imager{
-		Quota:       fs.Int64("quota", 0, ""),
-		S3Region:    fs.String("s3-region", "", ""),
-		S3Bucket:    fs.String("s3-bucket", "", ""),
-		S3AccessKey: fs.String("s3-access-key", "", ""),
-		S3SecretKey: fs.String("s3-secret-key", "", ""),
+		Quota:       flags.Int64("quota", 0, ""),
+		S3Region:    flags.String("s3-region", "", ""),
+		S3Bucket:    flags.String("s3-bucket", "", ""),
+		S3AccessKey: flags.String("s3-access-key", "", ""),
+		S3SecretKey: flags.String("s3-secret-key", "", ""),
 		sources:     make(map[string]*Source),
 	}
 
-	service.Register("imager", serv, fs)
+	// Register Imager service along with handler methods.
+	service.Register("imager", flags, []service.Handler{
+		{"GET", "/:params/*image", serv.Process},
+	})
 }

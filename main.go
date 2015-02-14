@@ -50,16 +50,5 @@ func main() {
 	select {
 	case <-sigStop:
 		fmt.Println("Shutting down server...")
-
-		errs := service.Shutdown()
-		if errs != nil {
-			fmt.Println("The following services failed to shut down cleanly:")
-			for _, err = range errs {
-				fmt.Println(err)
-			}
-
-			fmt.Println("The environment might be in an unclean state")
-			os.Exit(2)
-		}
 	}
 }
