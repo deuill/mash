@@ -1,6 +1,7 @@
 package imager
 
 import (
+	// Standard library
 	"container/list"
 	"io/ioutil"
 	"os"
@@ -27,11 +28,14 @@ type file struct {
 }
 
 // A map of initialized caches, indexed under their path names. This is checked against every time
-// a new cache is initialized, and is used to provide exclusivity guarantees for the local cache.
+// a new cache is initialized, and is used to provide exclusivity guarantees for local access.
 var caches map[string]*FileCache
 
+// NewFileCache initializes a file cache under a specific path, most commonly a temporary directory,
+// with an optional quota on the cache size. If the size of the quota is zero, the limit is assumed
+// to be infinite.
 func NewFileCache(path string, quota int64) (*FileCache, error) {
-	// Check if a cache already exists for this path, and return initialized cache, if any.
+	// Check if a cache already exists for this path and return it, if any exists.
 	if f, exists := caches[path]; exists {
 		// Update quota size for cache, if the new quota size is greater than the existing one.
 		if quota == 0 || f.quota > 0 && f.quota < quota {
@@ -65,6 +69,8 @@ func NewFileCache(path string, quota int64) (*FileCache, error) {
 	return caches[path], nil
 }
 
+// Add inserts in `value` to file pointed to by `key`. Variable `value` is assumed to be a `[]byte`
+// type, but is passed as an `interface{}` type to satisfy the generic `Cacher` interface.
 func (f *FileCache) Add(key string, value interface{}) {
 	var ok bool
 	var data []byte
@@ -116,6 +122,7 @@ func (f *FileCache) Add(key string, value interface{}) {
 	f.cache[key] = el
 }
 
+// Get returns data stored under `key`, or `nil` if no data exists.
 func (f *FileCache) Get(key string) interface{} {
 	// Check reverse lookup table for file entry.
 	if el, exists := f.cache[key]; exists {
@@ -139,18 +146,21 @@ func (f *FileCache) Get(key string) interface{} {
 	return nil
 }
 
+// Remove removes file stored under `key`.
 func (f *FileCache) Remove(key string) {
 	if el, exists := f.cache[key]; exists {
 		f.removeElement(el)
 	}
 }
 
+// RemoveOldest removes the oldest file in cache, as determined by access time.
 func (f *FileCache) RemoveOldest() {
 	if el := f.order.Back(); el != nil {
 		f.removeElement(el)
 	}
 }
 
+// Delete file stored on disk as well as any internal state related to file.
 func (f *FileCache) removeElement(el *list.Element) {
 	f.Lock()
 	defer f.Unlock()
@@ -164,6 +174,7 @@ func (f *FileCache) removeElement(el *list.Element) {
 	f.order.Remove(el)
 }
 
+// Initialize common package variables.
 func init() {
 	caches = make(map[string]*FileCache)
 }

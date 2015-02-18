@@ -1,7 +1,7 @@
 package imager
 
 import (
-	// Internal packages
+	// Standard library
 	"fmt"
 	"os"
 	"path"

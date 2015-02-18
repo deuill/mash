@@ -29,10 +29,12 @@ type Handler struct {
 	Handle HandleFunc // The method to use for this handler.
 }
 
-// A proxy type for parameters passed to handlers.
+// Params are attached to methods according to their path declarations, and may contain values
+// corresponding to named parameters declared on those paths.
 type Params httprouter.Params
 
-// A proxy method for the httprouter.Params.ByName method.
+// Get returns the value corresponding to a named parameter. It returns an empty string if no value
+// was found.
 func (p Params) Get(name string) string {
 	return httprouter.Params(p).ByName(name)
 }

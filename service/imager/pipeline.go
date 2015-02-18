@@ -5,6 +5,7 @@ package imager
 import "C"
 
 import (
+	// Standard library
 	"bytes"
 	"fmt"
 	"image"
@@ -31,6 +32,8 @@ type Pipeline struct {
 	Frame   bool      `default:"false"`                // If true, only return first frame of animated GIF.
 }
 
+// NewPipeline initializes a new pipeline, along with defaults as set in the `Pipeline` structure
+// definition.
 func NewPipeline() (*Pipeline, error) {
 	p := &Pipeline{}
 	pt := reflect.ValueOf(p).Elem().Type()
@@ -38,7 +41,7 @@ func NewPipeline() (*Pipeline, error) {
 	// Set default values from field tags.
 	for i := 0; i < pt.NumField(); i++ {
 		f := pt.Field(i)
-		if err := p.SetString(f.Name, f.Tag.Get("default")); err != nil {
+		if err := p.SetOption(f.Name, f.Tag.Get("default")); err != nil {
 			return nil, err
 		}
 	}
@@ -46,7 +49,10 @@ func NewPipeline() (*Pipeline, error) {
 	return p, nil
 }
 
-func (p *Pipeline) SetString(field, value string) error {
+// SetOption sets pipeline option specified by `value`, silently converting the string value to
+// the type required by the `Pipeline` structure field. If the field is not found, or setting the
+// value is impossible, an error is returned.
+func (p *Pipeline) SetOption(field, value string) error {
 	fname := strings.Title(field)
 
 	pv := reflect.ValueOf(p).Elem()
@@ -117,6 +123,9 @@ type Image struct {
 	Type string // The image MIME type.
 }
 
+// Process image in `data` according to the pipeline setup, and return resulting Image structure as
+// a pointer. The original data passed to the function is never modified directly, and is safe for
+// reuse.
 func (p *Pipeline) Process(data []byte) (*Image, error) {
 	imgType := GetFileType(data)
 
@@ -416,6 +425,7 @@ func GetFileType(data []byte) string {
 	return fileType
 }
 
+// Initialize package variables and set up VIPS library for future processing.
 func init() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
