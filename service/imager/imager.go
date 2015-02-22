@@ -33,7 +33,6 @@ func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Param
 	}
 
 	params, imgPath := p.Get("params"), p.Get("image")
-
 	if imgPath == "" {
 		return nil, fmt.Errorf("image URL is unset or empty")
 	}
@@ -48,7 +47,7 @@ func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Param
 	}
 
 	// Unpack request parameters and prepare a pipeline for subsequent operations.
-	req, err := base64.StdEncoding.DecodeString(params)
+	dec, err := base64.StdEncoding.DecodeString(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode base64-encoded parameters")
 	}
@@ -58,7 +57,7 @@ func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Param
 		return nil, fmt.Errorf("failed to initialize pipeline: %s", err)
 	}
 
-	for _, p := range strings.Split(string(req), ",") {
+	for _, p := range strings.Split(string(dec), ",") {
 		t := strings.Split(p, "=")
 		if len(t) != 2 {
 			return nil, fmt.Errorf("request parameter for pipeline is malformed: '%s'", p)
@@ -89,6 +88,42 @@ func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Param
 	writeResponse(img.Data, img.Size, img.Type, w)
 
 	return nil, nil
+}
+
+// Purge removes the original image pointed to by the request, along with any processed child images
+// in the local cache and the remote server.
+func (m *Imager) Purge(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
+	// Get source for this request, pulling the region and bucket names from request headers.
+	src, err := m.getSource(r.Header.Get("X-S3-Region"), r.Header.Get("X-S3-Bucket"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Get image URL from request.
+	imgPath := p.Get("image")
+	if imgPath == "" {
+		return nil, fmt.Errorf("image URL is unset or empty")
+	}
+
+	imgDir, imgName := path.Split(imgPath)
+
+	// Fetch list of directories in image path and append image name to each directory.
+	dirList, err := src.ListDirs(imgDir)
+	if err != nil {
+		return nil, err
+	}
+
+	dirList = append(dirList, imgDir)
+	for i := range dirList {
+		dirList[i] = path.Join(dirList[i], imgName)
+	}
+
+	// Delete images from local and remote cache.
+	if err = src.Delete(dirList...); err != nil {
+		return nil, err
+	}
+
+	return map[string]bool{"result": true}, nil
 }
 
 // Gets source according to region and bucket, and initializes local cache on that source. Passing
@@ -146,5 +181,6 @@ func init() {
 	// Register Imager service along with handler methods.
 	service.Register("imager", flags, []service.Handler{
 		{"GET", "/:params/*image", serv.Process},
+		{"DELETE", "/*image", serv.Purge},
 	})
 }

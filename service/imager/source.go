@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	// Third-party packages
@@ -19,6 +20,9 @@ type Source struct {
 	cache  *FileCache
 }
 
+// NewSource initializes a new source for region and bucket. Access is either provided by access and
+// secret keys passed as parameters, or by IAM if the keys are invalid or empty. Any subsequent
+// operations on the initialized source will affect the bucket pointed to.
 func NewSource(region, bucket, accessKey, secretKey string) (*Source, error) {
 	// Authorization token is set to expire 5 years in the future.
 	auth, err := aws.GetAuth(accessKey, secretKey, "", time.Now().AddDate(5, 0, 0))
@@ -37,10 +41,11 @@ func NewSource(region, bucket, accessKey, secretKey string) (*Source, error) {
 	return s, nil
 }
 
+// InitCache initializes and attaches local cache to source.
 func (s *Source) InitCache(base string, size int64) error {
-	path := path.Join(os.TempDir(), base, s.bucket.Region.Name, s.bucket.Name)
+	base = path.Join(os.TempDir(), base, s.bucket.Region.Name, s.bucket.Name)
 
-	c, err := NewFileCache(path, size)
+	c, err := NewFileCache(base, size)
 	if err != nil {
 		return err
 	}
@@ -49,45 +54,85 @@ func (s *Source) InitCache(base string, size int64) error {
 	return nil
 }
 
-func (s *Source) Get(path string) ([]byte, error) {
+// Get fetches file data from local cache or S3 bucket for this source.
+func (s *Source) Get(name string) ([]byte, error) {
 	// Check for locally cached data.
 	if s.cache != nil {
-		if data := s.cache.Get(path); data != nil {
+		if data := s.cache.Get(name); data != nil {
 			return data.([]byte), nil
 		}
 	}
 
 	// Get data from S3 bucket.
-	data, err := s.bucket.Get(path)
+	data, err := s.bucket.Get(name)
 	if err != nil {
 		return nil, err
 	}
 
 	// Cache data locally.
 	if s.cache != nil {
-		s.cache.Add(path, data)
+		s.cache.Add(name, data)
 	}
 
 	return data, nil
 }
 
-func (s *Source) Put(path string, data []byte, ctype string) error {
+// Put inserts data into local cache and remote S3 bucket for this source.
+func (s *Source) Put(name string, data []byte, ctype string) error {
 	// Store data locally.
 	if s.cache != nil {
-		s.cache.Add(path, data)
+		s.cache.Add(name, data)
 	}
 
 	// Store data in S3 bucket. The initial upload is placed with a `.tmp` prefix, and is renamed
 	// after it has uploaded successfully.
-	if err := s.bucket.Put(path+".tmp", data, ctype, "", s3.Options{}); err != nil {
+	if err := s.bucket.Put(name+".tmp", data, ctype, "", s3.Options{}); err != nil {
 		return err
 	}
 
-	if _, err := s.bucket.PutCopy(path, "", s3.CopyOptions{}, s.bucket.Name+"/"+path+".tmp"); err != nil {
+	src := path.Join(s.bucket.Name, name+".tmp")
+	if _, err := s.bucket.PutCopy(name, "", s3.CopyOptions{}, src); err != nil {
 		return err
 	}
 
-	s.bucket.Del(path + ".tmp")
+	s.bucket.Del(name + ".tmp")
 
 	return nil
+}
+
+// Delete removes one or more files from local cache and S3 bucket for this source.
+func (s *Source) Delete(name ...string) error {
+	// Delete from local cache.
+	if s.cache != nil {
+		for _, p := range name {
+			s.cache.Remove(p)
+		}
+	}
+
+	// Build objects list and delete from S3.
+	objects := make([]s3.Object, len(name))
+	for i := range objects {
+		objects[i].Key = strings.TrimPrefix(name[i], "/")
+	}
+
+	if err := s.bucket.DelMulti(s3.Delete{true, objects}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ListDirs returns the full paths to any directories contained in `path`.
+func (s *Source) ListDirs(path string) ([]string, error) {
+	resp, err := s.bucket.List(strings.TrimPrefix(path, "/"), "/", "", 0)
+	if err != nil {
+		return nil, err
+	}
+
+	dirs := make([]string, len(resp.CommonPrefixes))
+	for i := range resp.CommonPrefixes {
+		dirs[i] = "/" + resp.CommonPrefixes[i]
+	}
+
+	return dirs, nil
 }
