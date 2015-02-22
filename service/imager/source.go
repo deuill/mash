@@ -122,9 +122,9 @@ func (s *Source) Delete(name ...string) error {
 	return nil
 }
 
-// ListDirs returns the full paths to any directories contained in `path`.
-func (s *Source) ListDirs(path string) ([]string, error) {
-	resp, err := s.bucket.List(strings.TrimPrefix(path, "/"), "/", "", 0)
+// ListDirs returns the full paths to any directories contained in path name.
+func (s *Source) ListDirs(name string) ([]string, error) {
+	resp, err := s.bucket.List(strings.TrimPrefix(name, "/"), "/", "", 0)
 	if err != nil {
 		return nil, err
 	}

@@ -138,8 +138,8 @@ func (f *FileCache) Get(key string) interface{} {
 
 // Remove removes file stored under `key`.
 func (f *FileCache) Remove(key string) {
-	f.RLock()
-	defer f.RUnlock()
+	f.Lock()
+	defer f.Unlock()
 
 	if el, exists := f.cache[key]; exists {
 		f.removeElement(el)
@@ -148,8 +148,8 @@ func (f *FileCache) Remove(key string) {
 
 // RemoveOldest removes the oldest file in cache, as determined by access time.
 func (f *FileCache) RemoveOldest() {
-	f.RLock()
-	defer f.RUnlock()
+	f.Lock()
+	defer f.Unlock()
 
 	if el := f.order.Back(); el != nil {
 		f.removeElement(el)
