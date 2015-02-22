@@ -18,7 +18,7 @@ type FileCache struct {
 	order *list.List               // A doubly-linked list of items, ordered by access time.
 	cache map[string]*list.Element // A reverse lookup table of item names to list elements.
 
-	sync.Mutex // Used for controlling concurrent access to item list and cache table.
+	sync.RWMutex // Used for controlling concurrent access to item list and cache table.
 }
 
 // A file represents all information required for operating on a file in the context of the cache.
@@ -34,9 +34,9 @@ var caches map[string]*FileCache
 // NewFileCache initializes a file cache under a specific path, most commonly a temporary directory,
 // with an optional quota on the cache size. If the size of the quota is zero, the limit is assumed
 // to be infinite.
-func NewFileCache(path string, quota int64) (*FileCache, error) {
+func NewFileCache(name string, quota int64) (*FileCache, error) {
 	// Check if a cache already exists for this path and return it, if any exists.
-	if f, exists := caches[path]; exists {
+	if f, exists := caches[name]; exists {
 		// Update quota size for cache, if the new quota size is greater than the existing one.
 		if quota == 0 || f.quota > 0 && f.quota < quota {
 			f.quota = quota
@@ -45,28 +45,24 @@ func NewFileCache(path string, quota int64) (*FileCache, error) {
 		return f, nil
 	}
 
-	// If directory structure already exists, remove it first, but only if we have a size limit.
-	if fi, err := os.Stat(path); err != nil && !os.IsNotExist(err) {
+	// Remove directory structure first, if any.
+	if err := os.RemoveAll(name); err != nil {
 		return nil, err
-	} else if fi != nil && fi.IsDir() && quota > 0 {
-		if err = os.RemoveAll(path); err != nil {
-			return nil, err
-		}
 	}
 
 	// Create directory structure for cached files.
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(name, 0755); err != nil {
 		return nil, err
 	}
 
-	caches[path] = &FileCache{
-		path:  path,
+	caches[name] = &FileCache{
+		path:  name,
 		quota: quota,
 		order: list.New(),
 		cache: make(map[string]*list.Element),
 	}
 
-	return caches[path], nil
+	return caches[name], nil
 }
 
 // Add inserts in `value` to file pointed to by `key`. Variable `value` is assumed to be a `[]byte`
@@ -124,11 +120,11 @@ func (f *FileCache) Add(key string, value interface{}) {
 
 // Get returns data stored under `key`, or `nil` if no data exists.
 func (f *FileCache) Get(key string) interface{} {
+	f.RLock()
+	defer f.RUnlock()
+
 	// Check reverse lookup table for file entry.
 	if el, exists := f.cache[key]; exists {
-		f.Lock()
-		defer f.Unlock()
-
 		if buf, err := ioutil.ReadFile(path.Join(f.path, key)); err == nil {
 			f.order.MoveToFront(el)
 			return buf
@@ -137,17 +133,14 @@ func (f *FileCache) Get(key string) interface{} {
 		return nil
 	}
 
-	// There is a possibility that the file exists on disk but is not yet tracked. If so, add it.
-	if buf, err := ioutil.ReadFile(path.Join(f.path, key)); err == nil {
-		f.Add(key, buf)
-		return buf
-	}
-
 	return nil
 }
 
 // Remove removes file stored under `key`.
 func (f *FileCache) Remove(key string) {
+	f.RLock()
+	defer f.RUnlock()
+
 	if el, exists := f.cache[key]; exists {
 		f.removeElement(el)
 	}
@@ -155,6 +148,9 @@ func (f *FileCache) Remove(key string) {
 
 // RemoveOldest removes the oldest file in cache, as determined by access time.
 func (f *FileCache) RemoveOldest() {
+	f.RLock()
+	defer f.RUnlock()
+
 	if el := f.order.Back(); el != nil {
 		f.removeElement(el)
 	}
@@ -162,9 +158,6 @@ func (f *FileCache) RemoveOldest() {
 
 // Delete file stored on disk as well as any internal state related to file.
 func (f *FileCache) removeElement(el *list.Element) {
-	f.Lock()
-	defer f.Unlock()
-
 	// Remove file and subtract file size from total usage.
 	os.Remove(path.Join(f.path, el.Value.(*file).key))
 	f.usage -= el.Value.(*file).size
