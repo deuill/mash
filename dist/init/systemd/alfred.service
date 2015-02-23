@@ -2,8 +2,8 @@
 Description=Alfred task runner
 
 [Service]
-User=http
-Group=http
+User=alfred
+Group=alfred
 
 PIDFile=/var/run/alfred/alfred.pid
 ExecStart=/usr/bin/alfred

@@ -52,7 +52,13 @@ rpm:
 
 	@mkdir -p .tmp/package
 	@make DESTDIR=.tmp/package install
-	@fpm -s dir -t rpm -n $(PROGRAM) -v $(VERSION) .tmp/package
+	@fpm -s dir -t rpm -n $(PROGRAM) -v $(VERSION) \
+	     --rpm-use-file-permissions \
+	     --config-files etc/$(PROGRAM) \
+	     --after-install dist/pkg/post-install \
+	     --after-update dist/pkg/post-install \
+	     --after-remove dist/pkg/post-remove \
+	     -C .tmp/package .
 
 uninstall:
 	@echo -e "\033[1mUninstalling '$(PROGRAM)'...\033[0m"

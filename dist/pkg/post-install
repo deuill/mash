@@ -1,0 +1,12 @@
+#!/bin/sh
+# Post-install script for Alfred.
+
+# Check if 'alfred' user exists, and create if not.
+getent passwd alfred > /dev/null 2>&1
+[ $? -ne 0 ] && useradd -r -d /tmp/alfred -s /sbin/nologin alfred
+
+# Change ownership of configuration files to user 'alfred'.
+chown -R alfred:alfred /etc/alfred
+
+# Allow binding to lower ports for 'alfred' binary.
+setcap 'cap_net_bind_service=+ep' /usr/bin/alfred

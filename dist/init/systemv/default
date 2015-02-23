@@ -2,8 +2,8 @@
 # This file contains configuration variables for the 'alfred' init script.
 
 # Defines the user under which the 'alfred' daemon is to run.
-# Default value: 'root'
-USER=root
+# Default value: 'alfred'
+USER=alfred
 
 # Defines the location of the global configuration file for 'alfred', as an absolute filepath.
 # Default value: '/etc/alfred/alfred.conf'
