@@ -29,8 +29,11 @@ start() {
 
 	echo -n $"Starting $name: "
 
-	daemon --user $USER "nohup $program >/dev/null 2>&1 &"
+	runuser -s /bin/bash - $USER -c "ulimit -S -c ${DAEMON_COREFILE_LIMIT:-0} > /dev/null 2>&1; nohup $program > /dev/null 2>&1 &"
+	sleep 0.5 && pidof $program > /dev/null 2>&1
 	retval=$?
+
+	[ $retval -eq 0 ] && success $"$base startup" || failure $"$base startup"
 	echo
 
 	[ $retval -eq 0 ] && touch $lockfile

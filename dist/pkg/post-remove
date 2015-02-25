@@ -1,6 +1,9 @@
 #!/bin/sh
 # Post-remove script for Alfred.
 
+# Change configuration directory permissions, if existing.
+[ -d /etc/alfred ] && chown -R root:root /etc/alfred
+
 # Remove user 'alfred' if exists.
 getent passwd alfred > /dev/null 2>&1
-[ $? -ne 0 ] && userdel alfred
+[ $? -eq 0 ] && userdel alfred
