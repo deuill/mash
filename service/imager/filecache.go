@@ -83,13 +83,15 @@ func (f *FileCache) Add(key string, value interface{}) {
 	}
 
 	f.Lock()
-	defer f.Unlock()
 
 	// If entry already exists, move to front and return.
 	if el, ok = f.cache[key]; ok {
 		f.order.MoveToFront(el)
+		f.Unlock()
 		return
 	}
+
+	f.Unlock()
 
 	// Create path heirarchy for file.
 	p := path.Join(f.path, key)
@@ -97,43 +99,55 @@ func (f *FileCache) Add(key string, value interface{}) {
 		return
 	}
 
-	// Push file pointer to front of file list.
+	// If writing the file would bring us above quota, remove oldest files as required.
+	// NOTE: If the call to write the data below fails, affected files will STILL be removed.
+	for f.quota > 0 && int64(len(data)) > f.quota {
+		f.RemoveOldest()
+	}
+
+	// Write file to disk.
+	if err := ioutil.WriteFile(p, data, 0644); err != nil {
+		return
+	}
+
+	f.Lock()
+
+	// Push file pointer to front of file list and increment quota usage.
 	el = f.order.PushFront(&file{
 		size: int64(len(data)),
 		key:  key,
 	})
 
-	// If writing the file would bring us above quota, remove oldest files as required.
-	// NOTE: If the call to write the data below fails, affected files will STILL be removed.
-	for f.quota > 0 && f.usage+el.Value.(*file).size > f.quota {
-		f.RemoveOldest()
-	}
-
-	if err := ioutil.WriteFile(p, data, 0644); err != nil {
-		f.order.Remove(el)
-		return
-	}
-
 	f.usage += el.Value.(*file).size
 	f.cache[key] = el
+	f.Unlock()
 }
 
 // Get returns data stored under `key`, or `nil` if no data exists.
 func (f *FileCache) Get(key string) interface{} {
+	var data []byte
+	var el *list.Element
+
 	f.RLock()
-	defer f.RUnlock()
 
 	// Check reverse lookup table for file entry.
-	if el, exists := f.cache[key]; exists {
-		if buf, err := ioutil.ReadFile(path.Join(f.path, key)); err == nil {
-			f.order.MoveToFront(el)
-			return buf
-		}
-
+	if el, _ = f.cache[key]; el == nil {
+		f.RUnlock()
 		return nil
 	}
 
-	return nil
+	f.RUnlock()
+
+	// Read file from disk and move file list entry to the front.
+	if buf, _ = ioutil.ReadFile(path.Join(f.path, key)); buf == nil {
+		return nil
+	}
+
+	f.Lock()
+	f.order.MoveToFront(el)
+	f.Unlock()
+
+	return buf
 }
 
 // Remove removes file stored under `key`.
