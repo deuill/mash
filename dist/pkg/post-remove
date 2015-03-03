@@ -1,6 +1,10 @@
 #!/bin/sh
 # Post-remove script for Alfred.
 
+# Stop 'alfred' service, if running.
+service alfred status > /dev/null 2>&1
+[ $? -eq 0 ] && service alfred stop
+
 # Change configuration directory permissions, if existing.
 [ -d /etc/alfred ] && chown -R root:root /etc/alfred
 

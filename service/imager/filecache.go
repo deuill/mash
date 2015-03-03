@@ -139,7 +139,7 @@ func (f *FileCache) Get(key string) interface{} {
 	f.RUnlock()
 
 	// Read file from disk and move file list entry to the front.
-	if buf, _ = ioutil.ReadFile(path.Join(f.path, key)); buf == nil {
+	if data, _ = ioutil.ReadFile(path.Join(f.path, key)); data == nil {
 		return nil
 	}
 
@@ -147,7 +147,7 @@ func (f *FileCache) Get(key string) interface{} {
 	f.order.MoveToFront(el)
 	f.Unlock()
 
-	return buf
+	return data
 }
 
 // Remove removes file stored under `key`.
