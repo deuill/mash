@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
-	"time"
 
 	// Third-party packages
 	"github.com/julienschmidt/httprouter"
@@ -52,66 +52,48 @@ func Register(name string, flags *flag.FlagSet, handlers []Handler) error {
 	}
 
 	for _, h := range handlers {
-		hv := h.Handle
-		handle := func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-			if result, err := hv(w, r, Params(p)); err != nil {
-				writeResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-				return
+		handle := h.Handle
+		call := func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+			if result, err := handle(w, r, Params(p)); err != nil {
+				respond(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			} else if result != nil {
-				writeResponse(w, http.StatusOK, result)
+				respond(w, http.StatusOK, result)
 			}
 		}
 
 		path := "/" + name + h.Path
-		router.Handle(h.Method, path, handle)
+		router.Handle(h.Method, path, call)
 	}
 
 	return nil
 }
 
 // Encode response in JSON and write to connection.
-func writeResponse(w http.ResponseWriter, code int, data interface{}) {
+func respond(w http.ResponseWriter, code int, data interface{}) {
 	// All responses are sent in UTF8-encoded JSON.
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 
 	b, err := json.Marshal(data)
 	if err != nil {
-		fmt.Fprintf(w, "{error: \"%s\"}", err)
+		fmt.Fprintf(w, `{error: "%s"}`, err)
 		return
 	}
 
-	w.Write(b)
+	w.Write(append(b, '\n'))
 	return
 }
 
-// Initialize services for Alfred, including internal HTTP service.
+// Initialize service host, including internal HTTP service.
 func Init() error {
-	var err error
-
-	// Start HTTP server, sending any errors back to the 'result' channel.
-	result := make(chan error)
-	go func() {
-		result <- http.ListenAndServe(":"+*port, router)
-	}()
-
-	// Allow for a 500 millisecond timeout before this function returns, in order to catch any
-	// errors that might be emitted by the HTTP server goroutine.
-	timeout := make(chan bool)
-	go func() {
-		time.Sleep(500 * time.Millisecond)
-		timeout <- true
-	}()
-
-	select {
-	// The HTTP server has returned before the timeout, which means that an error has occured.
-	case err = <-result:
+	ln, err := net.Listen("tcp", net.JoinHostPort("", *port))
+	if err != nil {
 		return err
-	// A timeout has occurred and no error has been received by the server, which probably
-	// means that everything went OK.
-	case <-timeout:
-		return nil
 	}
+
+	go http.Serve(ln, router)
+
+	return nil
 }
 
 // Initialize internal resources and configuration variables.
