@@ -83,19 +83,11 @@ func (f *FileCache) Add(key string, value interface{}) {
 	}
 
 	f.Lock()
+	defer f.Unlock()
 
 	// If entry already exists, move to front and return.
 	if el, ok = f.cache[key]; ok {
 		f.order.MoveToFront(el)
-		f.Unlock()
-		return
-	}
-
-	f.Unlock()
-
-	// Create path heirarchy for file.
-	p := path.Join(f.path, key)
-	if err := os.MkdirAll(path.Dir(p), 0755); err != nil {
 		return
 	}
 
@@ -105,14 +97,18 @@ func (f *FileCache) Add(key string, value interface{}) {
 		f.RemoveOldest()
 	}
 
+	// Create path heirarchy for file.
+	p := path.Join(f.path, key)
+	if err := os.MkdirAll(path.Dir(p), 0755); err != nil {
+		return
+	}
+
 	// Write file to disk.
 	if err := ioutil.WriteFile(p, data, 0644); err != nil {
 		return
 	}
 
-	f.Lock()
-
-	// Push file pointer to front of file list and increment quota usage.
+	// Push file pointer to front of file list.
 	el = f.order.PushFront(&file{
 		size: int64(len(data)),
 		key:  key,
@@ -120,7 +116,6 @@ func (f *FileCache) Add(key string, value interface{}) {
 
 	f.usage += el.Value.(*file).size
 	f.cache[key] = el
-	f.Unlock()
 }
 
 // Get returns data stored under `key`, or `nil` if no data exists.
@@ -143,18 +138,18 @@ func (f *FileCache) Get(key string) interface{} {
 		return nil
 	}
 
-	f.Lock()
-	f.order.MoveToFront(el)
-	f.Unlock()
+	// Move element to the front of the list asynchronously.
+	go func() {
+		f.Lock()
+		f.order.MoveToFront(el)
+		f.Unlock()
+	}()
 
 	return data
 }
 
 // Remove removes file stored under `key`.
 func (f *FileCache) Remove(key string) {
-	f.Lock()
-	defer f.Unlock()
-
 	if el, exists := f.cache[key]; exists {
 		f.removeElement(el)
 	}
@@ -162,9 +157,6 @@ func (f *FileCache) Remove(key string) {
 
 // RemoveOldest removes the oldest file in cache, as determined by access time.
 func (f *FileCache) RemoveOldest() {
-	f.Lock()
-	defer f.Unlock()
-
 	if el := f.order.Back(); el != nil {
 		f.removeElement(el)
 	}
