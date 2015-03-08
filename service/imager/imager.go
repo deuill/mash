@@ -81,11 +81,14 @@ func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Param
 		return nil, err
 	}
 
-	// Store image in local cache and upload to S3 bucket asynchronously.
-	go src.Put(procPath, img.Data, img.Type)
-
-	// Write response back to user.
-	writeResponse(img.Data, img.Size, img.Type, w)
+	// If processing a GET request, store image locally and upload to S3 bucket asynchronously, then
+	// write image back to user. Otherwise, wait for upload process to complete and return nothing.
+	if r.Method == "GET" {
+		go src.Put(procPath, img.Data, img.Type)
+		writeResponse(img.Data, img.Size, img.Type, w)
+	} else {
+		src.Put(procPath, img.Data, img.Type)
+	}
 
 	return nil, nil
 }
@@ -180,6 +183,7 @@ func init() {
 
 	// Register Imager service along with handler methods.
 	service.Register("imager", flags, []service.Handler{
+		{"HEAD", "/:params/*image", serv.Process},
 		{"GET", "/:params/*image", serv.Process},
 		{"DELETE", "/*image", serv.Purge},
 	})
