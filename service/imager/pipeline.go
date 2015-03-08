@@ -193,23 +193,24 @@ func (p *Pipeline) Process(data []byte) (*Image, error) {
 	}
 
 	img := &Image{data, int64(len(data)), imgType}
-	vipsImg := C.Vips_image_init()
+	vipsImg, vipsLoaded := C.Vips_image_init(), C.Vips_image_init()
 
 	defer C.vips_error_clear()
 	defer C.vips_thread_shutdown()
 
 	switch img.Type {
 	case "image/jpeg":
-		vipsImg = C.Vips_load_jpeg(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size))
+		vipsLoaded = C.Vips_load_jpeg(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size))
 	case "image/png":
-		vipsImg = C.Vips_load_png(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size))
+		vipsLoaded = C.Vips_load_png(unsafe.Pointer(&img.Data[0]), C.size_t(img.Size))
 	}
 
-	if vipsImg == nil {
+	if vipsLoaded == nil {
 		return nil, fmt.Errorf("failed to load image of type '%s'", img.Type)
 	}
 
-	defer C.g_object_unref(C.gpointer(vipsImg))
+	defer C.g_object_unref(C.gpointer(vipsLoaded))
+	vipsImg = vipsLoaded
 
 	var factor float64
 	imgWidth := int64(vipsImg.Xsize)
@@ -436,6 +437,6 @@ func init() {
 	}
 
 	C.vips_concurrency_set(1)
-	C.vips_cache_set_max_mem(1048576 * 128) // 128MB
-	C.vips_cache_set_max(500)               // 500 operations
+	C.vips_cache_set_max_mem(1024 * 1024 * 128) // 128MB
+	C.vips_cache_set_max(256)                   // 256 operations
 }
