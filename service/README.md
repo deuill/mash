@@ -86,7 +86,7 @@ scheme.
 ## Handling requests
 
 After all registered services complete their initialization routine, the service host initializes its
-internal HTTP server and begins accepting requests on a specified TCP port (default is 6116).
+internal HTTP server and begins accepting requests on a specified TCP port (default is `6116`).
 
 Methods registered using `service.Register` are made available under their service name, followed by
 the path specified in their Handler type. Paths are matched according to rules specified in the
@@ -103,11 +103,11 @@ http://localhost:6116/helloworld/goodbye
 Any method registered in this way is expected to correspond to the following declaration:
 
 ```go
-func (h *ServiceName) MethodName(http.ResponseWriter, *http.Request, service.Params) (interface{}, error)
+func (*ServiceName) MethodName(http.ResponseWriter, *http.Request, service.Params) (interface{}, error)
 ```
 
 Methods can handle any arguments bound to the HTTP request via the `service.Params` type, which
-allows you to fetch named parameters via the `Get` method, or on their own using the `http.Request`
+allows you to fetch named parameters via the `Params.Get` method, or on their own using the `http.Request`
 type.
 
 Returning data to the user can be accomplished by returning any non-`nil` data, in which case
