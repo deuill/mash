@@ -1,7 +1,5 @@
 # The Imager service
 
-## Introduction
-
 The Imager service for Alfred provides methods for processing JPEG, PNG and GIF images, using S3 as
 a backing store. Images are processed according to a pipeline, which is provided in the request, and
 which uniquely describes the resulting image in relation to the original image.
@@ -19,7 +17,7 @@ request would be in this form:
 
 ```
 http://alfred.hearst.com/imager/d2lkdGg9NTAwLGZpdD1jcm9wCg==/header/promo/kittens-hats.jpg
-└─────── 1 ───────┘└─ 2 ─┘└───────── 3 ─────────┘└───────── 4 ──────────┘
+|--------- 1 ----------||- 2 -||----------- 3 -------------||------------ 4 -------------|
 ```
 
 The request URL contains 4 distinct parts:
@@ -27,7 +25,7 @@ The request URL contains 4 distinct parts:
   1. The hostname on which Alfred is listening, and which is used for accessing all services
      attached to the Alfred instance.
   2. The service name, which is unique to each service.
-  3. The base64-encoded pipeline parameters (in this case, "width=500,fit=crop").
+  3. The base64-encoded pipeline parameters (in this case, `width=500,fit=crop`).
   4. The original image URL, relative to the S3 bucket root directory.
 
 A request of this form would first attempt to fetch the processed image from the local and remote
@@ -53,12 +51,12 @@ following specification:
 
 Parameter name | Description                                         | Accepted values                 | Default value
 ---------------|-----------------------------------------------------|---------------------------------|--------------
-width          | Image width. If 0, calculate from height            | 0 ... Infinity                  | 0
-height         | Image height. If 0, calculate from width            | 0 ... Infinity                  | 0
+width          | Image width. If 0, calculate from height            | 0 ... infinity                  | 0
+height         | Image height. If 0, calculate from width            | 0 ... infinity                  | 0
 quality        | Image quality for JPEG and compression rate for PNG | 1 ... 100                       | 75
 fit            | Fit mode. If "clip", resize without cropping        | clip, crop                      | crop
 crop           | Cropping strategy                                   | top, bottom, left, right, focus | top
-focus          | Bounding box for "focus" strategy                   | w:h:x:y, as integer values      | 0:0:0:0
+focus          | Bounding box for "focus" strategy                   | width:height:x-pos:y-pos        | 0:0:0:0
 frame          | If "true", only returns first frame of GIF          | true, false                     | false
 
 Parameters are comma-separated key-value assignments, for example "width=500,fit=crop". Certain
@@ -121,11 +119,8 @@ would allow such requests to return immediately.
 
 Processed images are uploaded back to the same S3 bucket and directory hosting the original file,
 following a naming scheme consistent with the request presented in the URL. For the above example,
-the full path for the resulting image would be:
-
-```
-/header/promo/d2lkdGg9NTAwLGZpdD1jcm9wCg==/kittens-hats.jpg
-```
+the full path for the resulting image would be
+`/header/promo/d2lkdGg9NTAwLGZpdD1jcm9wCg==/kittens-hats.jpg`.
 
 Thus, processed images are stored in a directory named after the pipeline parameters that were used
 for generating them, under the same directory as their originals. This makes it possible to
