@@ -1,14 +1,13 @@
 # The Imager service
 
 The Imager service for Alfred provides methods for processing JPEG, PNG and GIF images, using S3 as
-a backing store. Images are processed according to a pipeline, which is provided in the request, and
+a backing store. Images are processed against a pipeline, which is provided in the request, and
 which uniquely describes the resulting image in relation to the original image.
 
-The Imager service aims to be simple (both in use and in implementation), reliable and reasonably
-speedy, while allowing for deterministic results. That is, assuming the original image pointed to
-by the request parameters is accessible and that the pipeline parameters are well-formed, Imager
-will always return a processed image, either from a local cache, the remote S3 store or by
-processing the image on-the-fly.
+Imager service aims to be simple (both in use and in implementation), reliable and reasonably
+speedy, while allowing for deterministic results. Assuming the original image pointed to by the
+request is accessible and that the pipeline parameters are well-formed, Imager will always return a processed image, either from a local cache, the remote S3 store or by processing the image
+on-the-fly.
 
 ## Request structure
 
@@ -17,7 +16,7 @@ request would be in this form:
 
 ```
 http://alfred.hearst.com/imager/d2lkdGg9NTAwLGZpdD1jcm9wCg==/header/promo/kittens-hats.jpg
-|--------- 1 ----------||- 2 -||----------- 3 -------------||------------ 4 -------------|
+<---------- 1 ---------><- 2 -><----------- 3 -------------><----------- 4 -------------->
 ```
 
 The request URL contains 4 distinct parts:
@@ -43,8 +42,7 @@ strategy, described further below.
 Image processing is handled via [VIPS](http://www.vips.ecs.soton.ac.uk), which is compiled into
 the Imager service as a C library. VIPS was chosen due to its excellent
 [performance characteristics](http://www.vips.ecs.soton.ac.uk/index.php?title=Speed_and_Memory_Use),
-its long history (the library has been around in various forms since the late 80s), and its clean
-and simple API.
+its stability, and its clean and simple API.
 
 The pipeline parameters provided with the request describe the resulting image, and conform to the
 following specification:
@@ -59,7 +57,7 @@ crop           | Cropping strategy                                   | top, bott
 focus          | Bounding box for "focus" strategy                   | width:height:x-pos:y-pos        | 0:0:0:0
 frame          | If "true", only returns first frame of GIF          | true, false                     | false
 
-Parameters are comma-separated key-value assignments, for example "width=500,fit=crop". Certain
+Parameters are comma-separated key-value assignments, for example `width=500,fit=crop`. Certain
 parameters have additional constraints on their values, as described below:
 
 ### `width` and `height`
@@ -76,9 +74,9 @@ resulting image.
 ### `fit`
 
 Determines whether an image should be cropped when resizing. For example, for an image size of
-*500x1000* and a pipeline of `width=400,height=400,fit=...`, `fit=clip` would result in an image
-size of *200x400*, whereas `fit=crop` would result in an image size of *400x400*, with extra pixels
-being removed according to the cropping strategy.
+**500x1000** and a pipeline of `width=400,height=400,fit=...`, `fit=clip` would result in an image
+size of **200x400**, whereas `fit=crop` would result in an image size of **400x400**, with extra
+pixels being removed according to the cropping strategy.
 
 ### `crop`
 
@@ -90,8 +88,8 @@ crop is determined by a bounding box, as passed in the `focus` parameter.
 ### `focus`
 
 This parameter defines the center of gravity for image crops as a bounding box. The bounding box is
-defined as four, colon-separated, integer values corresponding to the width, height, X and Y position
-of the bounding box relative to the original image's dimensions.
+defined as four, colon-separated, integer values corresponding to the width, height, X and Y
+position of the bounding box relative to the original image's dimensions.
 
 ### `frame`
 
