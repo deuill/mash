@@ -1,5 +1,7 @@
 # Mash - the simple task runner
 
+[![MIT License][license-svg]][license-url]
+
 Mash is a simple task runner -- a service that listens on a standard TCP port and accepts commands
 over a RESTful interface. It is written in Go and is designed to be simple to build, deploy and use.
 
@@ -40,3 +42,10 @@ port = 8080
 
 set as a persistent value in the local file. Environment variables override file variables, which in
 turn override defaults.
+
+## License
+
+Mash is licensed under the MIT license, the terms of which can be found in the included LICENSE file.
+
+[license-url]: https://github.com/deuill/mash/blob/master/LICENSE
+[license-svg]: https://img.shields.io/badge/license-MIT-blue.svg
