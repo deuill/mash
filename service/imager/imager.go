@@ -72,13 +72,13 @@ func (m *Imager) Process(w http.ResponseWriter, r *http.Request, p service.Param
 	// Fetch original image from remote server or local cache.
 	origImg, err := src.Get(imgPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch from source: %s", err)
 	}
 
 	// Process image through pipeline.
 	img, err := pipeline.Process(origImg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to process image: %s", err)
 	}
 
 	// If processing a GET request, store image locally and upload to S3 bucket asynchronously, then

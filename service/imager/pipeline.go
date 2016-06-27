@@ -167,7 +167,12 @@ func (p *Pipeline) Process(data []byte) (*Image, error) {
 		}
 
 		// Otherwise, process each frame and rebuild GIF file.
-		gifenc := &gif.GIF{make([]*image.Paletted, len(frames)), gifdec.Delay, gifdec.LoopCount}
+		gifenc := &gif.GIF{
+			Image:     make([]*image.Paletted, len(frames)),
+			Delay:     gifdec.Delay,
+			LoopCount: gifdec.LoopCount,
+		}
+
 		for i, frm := range frames {
 			b := bytes.NewBuffer(frm.Data)
 			im, err := jpeg.Decode(b)
