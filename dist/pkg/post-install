@@ -1,12 +1,12 @@
 #!/bin/sh
-# Post-install script for Alfred.
+# Post-install script for Mash.
 
-# Check if 'alfred' user exists, and create if not.
-getent passwd alfred > /dev/null 2>&1
-[ $? -ne 0 ] && useradd -r -d /tmp/alfred -s /sbin/nologin alfred
+# Check if 'mash' user exists, and create if not.
+getent passwd mash > /dev/null 2>&1
+[ $? -ne 0 ] && useradd -r -d /tmp/mash -s /sbin/nologin mash
 
-# Change ownership of configuration files to user 'alfred'.
-chown -R alfred:alfred /etc/alfred
+# Change ownership of configuration files to user 'mash'.
+chown -R mash:mash /etc/mash
 
-# Allow binding to lower ports for 'alfred' binary.
-setcap 'cap_net_bind_service=+ep' /usr/bin/alfred
+# Allow binding to lower ports for 'mash' binary.
+setcap 'cap_net_bind_service=+ep' /usr/bin/mash

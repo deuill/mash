@@ -1,12 +1,12 @@
 [Unit]
-Description=Alfred task runner
+Description=Mash task runner
 
 [Service]
-User=alfred
-Group=alfred
+User=mash
+Group=mash
 
-PIDFile=/var/run/alfred/alfred.pid
-ExecStart=/usr/bin/alfred
+PIDFile=/var/run/mash/mash.pid
+ExecStart=/usr/bin/mash
 
 [Install]
 WantedBy=multi-user.target

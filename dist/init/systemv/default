@@ -1,10 +1,10 @@
-# /etc/default/alfred
-# This file contains configuration variables for the 'alfred' init script.
+# /etc/default/mash
+# This file contains configuration variables for the 'mash' init script.
 
-# Defines the user under which the 'alfred' daemon is to run.
-# Default value: 'alfred'
-USER=alfred
+# Defines the user under which the 'mash' daemon is to run.
+# Default value: 'mash'
+USER=mash
 
-# Defines the location of the global configuration file for 'alfred', as an absolute filepath.
-# Default value: '/etc/alfred/alfred.conf'
-ALFRED_CONFIG=/etc/alfred/alfred.conf
+# Defines the location of the global configuration file for 'mash', as an absolute filepath.
+# Default value: '/etc/mash/mash.conf'
+MASH_CONFIG=/etc/mash/mash.conf

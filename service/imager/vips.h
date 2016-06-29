@@ -3,7 +3,7 @@
 #include <vips/vips7compat.h>
 
 int Vips_init() {
-	return vips_init("alfred.imager.vips");
+	return vips_init("mash.ico.vips");
 }
 
 VipsImage *Vips_image_init() {

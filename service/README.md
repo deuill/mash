@@ -1,13 +1,13 @@
-# Services in Alfred
+# Services in Mash
 
-By default, Alfred provides no built-in tasks, and instead acts as host to services, self-contained
-pieces of code that attach themselves to Alfred according to a minimal set of rules.
+By default, Mash provides no built-in tasks, and instead acts as host to services, self-contained
+pieces of code that attach themselves to Mash according to a minimal set of rules.
 
 ## Structure
 
 A service consists of a folder containing any number of `go` files in a package named after the
 folder in which the files are contained. The package defines a custom type, which is registered with
-Alfred, and methods attached to that type which correspond to available tasks within that service.
+Mash, and methods attached to that type which correspond to available tasks within that service.
 
 ## Sample Service
 
@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Hearst-Digital/alfred/service"
+	"github.com/deuill/mash/service"
 )
 
 type Helloworld struct {

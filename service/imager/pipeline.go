@@ -1,4 +1,4 @@
-package imager
+package ico
 
 // #cgo pkg-config: vips
 // #include "vips.h"

@@ -22,7 +22,7 @@ var (
 // A HandleFunc represents the default signature for registered methods attached to services.
 type HandleFunc func(http.ResponseWriter, *http.Request, Params) (interface{}, error)
 
-// Handler represents a registered handler method attached to Alfred.
+// Handler represents a registered handler method attached to Mash.
 type Handler struct {
 	Method string     // The HTTP method handler is attached under, e.g. GET, POST, DELETE etc.
 	Path   string     // The request path to bind handler against. Supports parameter bindings.
@@ -39,7 +39,7 @@ func (p Params) Get(name string) string {
 	return httprouter.Params(p).ByName(name)
 }
 
-// Register service for use with Alfred.
+// Register service for use with Mash.
 func Register(name string, flags *flag.FlagSet, handlers []Handler) error {
 	if _, exists := services[name]; exists {
 		return fmt.Errorf("Service '%s' already exists, refusing to overwrite", name)

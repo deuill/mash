@@ -1,11 +1,11 @@
-# Makefile for Alfred. Run 'make' to build locally, 'make install' to install binaries and other
+# Makefile for Mash. Run 'make' to build locally, 'make install' to install binaries and other
 # data, 'make package' to prepare a redistributable package.
 #
 # User-defined build options.
 #
 COMPILER = gc
-PROGRAM  = alfred
-REPO     = github.com/Hearst-Digital/alfred
+PROGRAM  = mash
+REPO     = github.com/deuill/mash
 
 # No editing from here on!
 

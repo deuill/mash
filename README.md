@@ -1,37 +1,37 @@
-# Alfred - the simple task runner
+# Mash - the simple task runner
 
-Alfred is a simple task runner -- a service that listens on a standard TCP port and accepts commands
+Mash is a simple task runner -- a service that listens on a standard TCP port and accepts commands
 over a RESTful interface. It is written in Go and is designed to be simple to build, deploy and use.
 
 ## Building
 
-Assuming you have all already installed build dependancies required via `go get`, building Alfred is
-simply a matter of running `make` in the project root. You may install Alfred by running `make install`
+Assuming you have all already installed build dependancies required via `go get`, building Mash is
+simply a matter of running `make` in the project root. You may install Mash by running `make install`
 or build a redistributable package using `make package`.
 
 ## Running
 
-You may either run Alfred directly using the 'alfred' binary, or use the supplied init script, which
-will also handle permissions and locking. By default, Alfred listens on port `6116` and does not need
+You may either run Mash directly using the 'mash' binary, or use the supplied init script, which
+will also handle permissions and locking. By default, Mash listens on port `6116` and does not need
 elevated permissions for operation.
 
 ## Configuration
 
-Alfred requires a minimal set of initial configuration, and relies on a good set of defaults for most
+Mash requires a minimal set of initial configuration, and relies on a good set of defaults for most
 operations. It can either use environment variables, or a local configuration file located in
-`/etc/alfred/alfred.conf` (the default location can be changed by setting an `ALFRED_CONFIG`
+`/etc/mash/mash.conf` (the default location can be changed by setting an `MASH_CONFIG`
 environment variable) for overriding default values, using the following semantics:
 
 Configuration values are namespaced under their service name and option key. Environment variables
-use an `ALFRED_` prefix, and are uppercase, while `alfred.conf` variables are placed in sections
+use an `MASH_` prefix, and are uppercase, while `mash.conf` variables are placed in sections
 using the service name as a key, and are lowercase. So, for an option `port` under service `http`,
 the following methods could be used to set the corresponding variable to `8080`:
 
 ```shell
-export ALFRED_HTTP_PORT=8080
+export MASH_HTTP_PORT=8080
 ```
 
-set in the environment in which `alfred` is launched, or:
+set in the environment in which `mash` is launched, or:
 
 ```ini
 [http]

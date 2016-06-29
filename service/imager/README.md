@@ -1,28 +1,28 @@
-# The Imager service
+# The Ico service
 
-The Imager service for Alfred provides methods for processing JPEG, PNG and GIF images, using S3 as
+The Ico service for Mash provides methods for processing JPEG, PNG and GIF images, using S3 as
 a backing store. Images are processed against a pipeline, which is provided in the request, and
 which uniquely describes the resulting image in relation to the original image.
 
-Imager service aims to be simple (both in use and in implementation), reliable and reasonably
+Ico service aims to be simple (both in use and in implementation), reliable and reasonably
 speedy, while allowing for deterministic results. Assuming the original image pointed to by the
-request is accessible and that the pipeline parameters are well-formed, Imager will always return a processed image, either from a local cache, the remote S3 store or by processing the image
+request is accessible and that the pipeline parameters are well-formed, Ico will always return a processed image, either from a local cache, the remote S3 store or by processing the image
 on-the-fly.
 
 ## Request structure
 
-Assuming Alfred is listening on an address `http://alfred.hearst.com` and port `80`, a common GET
+Assuming Mash is listening on an address `http://mash.deuill.org` and port `80`, a common GET
 request would be in this form:
 
 ```
-http://alfred.hearst.com/imager/d2lkdGg9NTAwLGZpdD1jcm9wCg==/header/promo/kittens-hats.jpg
+http://mash..deuill.org/ico/d2lkdGg9NTAwLGZpdD1jcm9wCg==/header/promo/kittens-hats.jpg
 <---------- 1 ---------><- 2 -><----------- 3 -------------><----------- 4 -------------->
 ```
 
 The request URL contains 4 distinct parts:
 
-  1. The hostname on which Alfred is listening, and which is used for accessing all services
-     attached to the Alfred instance.
+  1. The hostname on which Mash is listening, and which is used for accessing all services
+     attached to the Mash instance.
   2. The service name, which is unique to each service.
   3. The base64-encoded pipeline parameters (in this case, `width=500,fit=crop`).
   4. The original image URL, relative to the S3 bucket root directory.
@@ -40,7 +40,7 @@ strategy, described further below.
 ## Image processing
 
 Image processing is handled via [VIPS](http://www.vips.ecs.soton.ac.uk), which is compiled into
-the Imager service as a C library. VIPS was chosen due to its excellent
+the Ico service as a C library. VIPS was chosen due to its excellent
 [performance characteristics](http://www.vips.ecs.soton.ac.uk/index.php?title=Speed_and_Memory_Use),
 its stability, and its clean and simple API.
 
@@ -98,7 +98,7 @@ frame in the image.
 
 ## Image caching
 
-Imager caches processed images in both a local cache and a remote cache, using S3. A rationale and
+Ico caches processed images in both a local cache and a remote cache, using S3. A rationale and
 description of caching strategies for each component is described below.
 
 ### Local cache
@@ -123,16 +123,16 @@ the full path for the resulting image would be
 Thus, processed images are stored in a directory named after the pipeline parameters that were used
 for generating them, under the same directory as their originals. This makes it possible to
 reconstruct the URL parameters used for generating the image stored in a reverse manner. It also
-allows applications with no knowledge of Imager's internal workings, i.e. a CDN, to fetch images
-directly from S3 using the same URL request structure as what would be passed Imager.
+allows applications with no knowledge of Ico's internal workings, i.e. a CDN, to fetch images
+directly from S3 using the same URL request structure as what would be passed Ico.
 
 ## Configuration
 
-Imager conforms to the Alfred standard of requiring the least amount of configuration state possible
+Ico conforms to the Mash standard of requiring the least amount of configuration state possible
 for functional use. Since all information required for processing images is passed in the request,
 the only remaining state pertains to the cache quota and any details required for S3 access, such as
 region name, bucket name, access key and secret key.
 
-However, since Imager allows for the region and bucket names to be provided in the `X-S3-Region` and
+However, since Ico allows for the region and bucket names to be provided in the `X-S3-Region` and
 `X-S3-Bucket` request headers, and, assuming access to S3 is provided via IAM for the running server,
 most configuration state is optional, and is mainly useful for small deployments or development.

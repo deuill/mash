@@ -7,25 +7,25 @@ import (
 	"os/signal"
 
 	// Internal packages
-	"github.com/Hearst-Digital/alfred/service"
+	"github.com/deuill/mash/service"
 
 	// Third-party packages
 	"github.com/rakyll/globalconf"
 )
 
-// Entry point for Alfred, this sets up global configuration and starts internal services.
+// Entry point for Mash, this sets up global configuration and starts internal services.
 func main() {
-	// Allow one to override the default configuration file location using the ALFRED_CONFIG env
+	// Allow one to override the default configuration file location using the MASH_CONFIG env
 	// variable. By definition, this variable exists outside of the configuration file and as such
 	// doesn't follow the same semantics as other configuration variables.
-	configFile := os.Getenv("ALFRED_CONFIG")
+	configFile := os.Getenv("MASH_CONFIG")
 	if configFile == "" {
-		configFile = "/etc/alfred/alfred.conf"
+		configFile = "/etc/mash/mash.conf"
 	}
 
-	// Initialize configuration, reading from environment variables using a 'ALFRED_' prefix first,
-	// then moving to a static configuration file, usually located in '/etc/alfred/alfred.conf'.
-	conf, err := globalconf.NewWithOptions(&globalconf.Options{configFile, "ALFRED_"})
+	// Initialize configuration, reading from environment variables using a 'MASH_' prefix first,
+	// then moving to a static configuration file, usually located in '/etc/mash/mash.conf'.
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{configFile, "MASH_"})
 	if err != nil {
 		fmt.Println("Error loading configuration:", err)
 		os.Exit(1)
@@ -43,7 +43,7 @@ func main() {
 
 	fmt.Println("done.")
 
-	// Listen for and terminate Alfred on SIGKILL or SIGINT signals.
+	// Listen for and terminate Mash on SIGKILL or SIGINT signals.
 	sigStop := make(chan os.Signal)
 	signal.Notify(sigStop, os.Interrupt, os.Kill)
 

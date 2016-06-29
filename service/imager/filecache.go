@@ -1,4 +1,4 @@
-package imager
+package ico
 
 import (
 	// Standard library

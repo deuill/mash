@@ -1,13 +1,13 @@
 #!/bin/sh
-# Post-remove script for Alfred.
+# Post-remove script for Mash.
 
-# Stop 'alfred' service, if running.
-service alfred status > /dev/null 2>&1
-[ $? -eq 0 ] && service alfred stop
+# Stop 'mash' service, if running.
+service mash status > /dev/null 2>&1
+[ $? -eq 0 ] && service mash stop
 
 # Change configuration directory permissions, if existing.
-[ -d /etc/alfred ] && chown -R root:root /etc/alfred
+[ -d /etc/mash ] && chown -R root:root /etc/mash
 
-# Remove user 'alfred' if exists.
-getent passwd alfred > /dev/null 2>&1
-[ $? -eq 0 ] && userdel alfred
+# Remove user 'mash' if exists.
+getent passwd mash > /dev/null 2>&1
+[ $? -eq 0 ] && userdel mash
