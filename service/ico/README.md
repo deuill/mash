@@ -16,7 +16,7 @@ request would be in this form:
 
 ```
 http://mash..deuill.org/ico/d2lkdGg9NTAwLGZpdD1jcm9wCg==/header/promo/kittens-hats.jpg
-<---------- 1 ---------><- 2 -><----------- 3 -------------><----------- 4 -------------->
+<--------- 1 --------->< 2 ><----------- 3 ------------><----------- 4 -------------->
 ```
 
 The request URL contains 4 distinct parts:
