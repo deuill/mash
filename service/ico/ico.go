@@ -2,7 +2,6 @@ package ico
 
 import (
 	// Standard library
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"net/http"
@@ -46,18 +45,13 @@ func (m *Ico) Process(w http.ResponseWriter, r *http.Request, p service.Params) 
 		return nil, nil
 	}
 
-	// Unpack request parameters and prepare a pipeline for subsequent operations.
-	dec, err := base64.StdEncoding.DecodeString(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64-encoded parameters")
-	}
-
+	// Prepare pipeline and set parameters from user request.
 	pipeline, err := NewPipeline()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize pipeline: %s", err)
 	}
 
-	for _, p := range strings.Split(string(dec), ",") {
+	for _, p := range strings.Split(params, ",") {
 		t := strings.Split(p, "=")
 		if len(t) != 2 {
 			return nil, fmt.Errorf("request parameter for pipeline is malformed: '%s'", p)

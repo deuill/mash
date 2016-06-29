@@ -9,21 +9,18 @@ Ico service aims to be simple (both in use and in implementation), reliable and 
 Assuming Mash is listening on an address `http://mash.deuill.org` and port `80`, a common GET request would be in this form:
 
 ```
-http://mash..deuill.org/ico/d2lkdGg9NTAwLGZpdD1jcm9wCg==/header/promo/kittens-hats.jpg
-<--------- 1 --------->< 2 ><----------- 3 ------------><----------- 4 -------------->
+http://mash.deuill.org/ico/width=500,fit=crop/header/promo/kittens-hats.jpg
+<--------- 1 -------->< 2 ><------ 3 -------><----------- 4 -------------->
 ```
 
 The request URL contains 4 distinct parts:
 
   1. The hostname on which Mash is listening, and which is used for accessing all services attached to the Mash instance.
   2. The service name, which is unique to each service.
-  3. The base64-encoded pipeline parameters (in this case, `width=500,fit=crop`).
+  3. The pipeline parameters, describing the resulting image.
   4. The original image URL, relative to the S3 bucket root directory.
 
 A request of this form would first attempt to fetch the processed image from the local and remote cache, and failing that, would create the image on-the-fly, populate the caches for the benefit of any future requests, and return the processed image to the user.
-
-While passing the pipeline parameters as base64-encoded strings in the URL may appear unorthodox, it allows the service to be used directly with no need for an SDK or any complex request header manipulation. It makes debugging easier, since a URL is also a complete description of the resulting image. Finally, it allows for orthogonal URL structures, which may become apparent in the caching
-strategy, described further below.
 
 ## Image processing
 
@@ -79,7 +76,7 @@ Though accessing files on S3 is reasonably quick, the time between a processed i
 
 ### S3 cache
 
-Processed images are uploaded back to the same S3 bucket and directory hosting the original file, following a naming scheme consistent with the request presented in the URL. For the above example, the full path for the resulting image would be `/header/promo/d2lkdGg9NTAwLGZpdD1jcm9wCg==/kittens-hats.jpg`.
+Processed images are uploaded back to the same S3 bucket and directory hosting the original file, following a naming scheme consistent with the request presented in the URL. For the above example, the full path for the resulting image would be `/header/promo/width=500,fit=crop/kittens-hats.jpg`.
 
 Thus, processed images are stored in a directory named after the pipeline parameters that were used for generating them, under the same directory as their originals. This makes it possible to reconstruct the URL parameters used for generating the image stored in a reverse manner. It also allows applications with no knowledge of Ico's internal workings, i.e. a CDN, to fetch images directly from S3 using the same URL request structure as what would be passed Ico.
 
