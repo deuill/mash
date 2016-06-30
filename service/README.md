@@ -27,20 +27,20 @@ type Helloworld struct {
 	Name *string
 }
 
-func (h *Helloworld) Hello(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
+func (h *Helloworld) Hello(w http.ResponseWriter, r *http.Request, p service.Params) (*service.Response, error) {
 	if *h.Name == "" {
 		return "", fmt.Errorf("Name is empty!")
 	}
 
-	return "Hello " + *h.Name + "!", nil
+	return &service.Response{http.StatusOK, "Hello " + *h.Name + "!"}, nil
 }
 
-func (h *Helloworld) Goodbye(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
+func (h *Helloworld) Goodbye(w http.ResponseWriter, r *http.Request, p service.Params) (*service.Response, error) {
 	if *h.Name == "" {
 		return "", fmt.Errorf("Name is empty!")
 	}
 
-	return "Goodbye " + *h.Name + "!", nil
+	return &service.Response{http.StatusOK, "Goodbye " + *h.Name + "!"}, nil
 }
 
 func init() {
@@ -88,9 +88,9 @@ http://localhost:6116/helloworld/goodbye
 Any method registered in this way is expected to correspond to the following declaration:
 
 ```go
-func (*ServiceName) MethodName(http.ResponseWriter, *http.Request, service.Params) (interface{}, error)
+func (*ServiceName) MethodName(http.ResponseWriter, *http.Request, service.Params) (*service.Response, error)
 ```
 
 Methods can handle any arguments bound to the HTTP request via the `service.Params` type, which allows you to fetch named parameters via the `Params.Get` method, or on their own using the `http.Request` type.
 
-Returning data to the user can be accomplished by returning any non-`nil` data, in which case the values are encoded as JSON before being returned, or manually through the `http.ResponseWriter` type, in which case the method is expected to return `nil` for the `interface{}` type.
+Returning data to the user can be accomplished by returning any non-`nil` `service.Response` type, in which case the values are encoded as JSON before being returned, or manually through the `http.ResponseWriter` type, in which case the method is expected to return `nil` for the `service.Response` type.

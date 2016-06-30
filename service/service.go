@@ -19,8 +19,14 @@ var (
 	router   *httprouter.Router // The default router for all incoming requests.
 )
 
+// Response represents a JSON response, containing a response code and serialise-able data.
+type Response struct {
+	Code int         // The HTTP response code.
+	Data interface{} // The data to serialise to JSON.
+}
+
 // A HandleFunc represents the default signature for registered methods attached to services.
-type HandleFunc func(http.ResponseWriter, *http.Request, Params) (interface{}, error)
+type HandleFunc func(http.ResponseWriter, *http.Request, Params) (*Response, error)
 
 // Handler represents a registered handler method attached to Mash.
 type Handler struct {
@@ -57,7 +63,7 @@ func Register(name string, flags *flag.FlagSet, handlers []Handler) error {
 			if result, err := handle(w, r, Params(p)); err != nil {
 				respond(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			} else if result != nil {
-				respond(w, http.StatusOK, result)
+				respond(w, result.Code, result.Data)
 			}
 		}
 

@@ -24,7 +24,7 @@ type Ico struct {
 }
 
 // Process request for image transformation, taking care caching both to local disk and S3.
-func (m *Ico) Process(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
+func (m *Ico) Process(w http.ResponseWriter, r *http.Request, p service.Params) (*service.Response, error) {
 	// Get source for this request, pulling the region and bucket names from request headers.
 	src, err := m.getSource(r.Header.Get("X-S3-Region"), r.Header.Get("X-S3-Bucket"))
 	if err != nil {
@@ -89,7 +89,7 @@ func (m *Ico) Process(w http.ResponseWriter, r *http.Request, p service.Params) 
 
 // Purge removes the original image pointed to by the request, along with any processed child images
 // in the local cache and the remote server.
-func (m *Ico) Purge(w http.ResponseWriter, r *http.Request, p service.Params) (interface{}, error) {
+func (m *Ico) Purge(w http.ResponseWriter, r *http.Request, p service.Params) (*service.Response, error) {
 	// Get source for this request, pulling the region and bucket names from request headers.
 	src, err := m.getSource(r.Header.Get("X-S3-Region"), r.Header.Get("X-S3-Bucket"))
 	if err != nil {
@@ -120,7 +120,7 @@ func (m *Ico) Purge(w http.ResponseWriter, r *http.Request, p service.Params) (i
 		return nil, err
 	}
 
-	return map[string]bool{"result": true}, nil
+	return &service.Response{http.StatusOK, map[string]bool{"result": true}}, nil
 }
 
 // Gets source according to region and bucket, and initializes local cache on that source. Passing
