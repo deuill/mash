@@ -26,43 +26,7 @@ A request of this form would first attempt to fetch the processed image from the
 
 Image processing is handled via [VIPS](http://www.vips.ecs.soton.ac.uk), which is compiled into the Ico service as a C library. VIPS was chosen due to its excellent [performance characteristics](http://www.vips.ecs.soton.ac.uk/index.php?title=Speed_and_Memory_Use), its stability, and its clean and simple API.
 
-The pipeline parameters provided with the request describe the resulting image, and conform to the following specification:
-
-Parameter name | Description                                         | Accepted values                 | Default value
----------------|-----------------------------------------------------|---------------------------------|--------------
-width          | Image width. If 0, calculate from height            | 0 ... infinity                  | 0
-height         | Image height. If 0, calculate from width            | 0 ... infinity                  | 0
-quality        | Image quality for JPEG and compression rate for PNG | 1 ... 100                       | 75
-fit            | Fit mode. If "clip", resize without cropping        | clip, crop                      | crop
-crop           | Cropping strategy                                   | top, bottom, left, right, focus | top
-focus          | Bounding box for "focus" strategy                   | width:height:x-pos:y-pos        | 0:0:0:0
-frame          | If "true", only returns first frame of GIF          | true, false                     | false
-
-Parameters are comma-separated key-value assignments, for example `width=500,fit=crop`. Certain parameters have additional constraints on their values, as described below:
-
-### `width` and `height`
-
-These parameters accept any integer value, but negative numbers and values that are equal or exceed the original image's resolution result in the original image being returned.
-
-### `quality`
-
-This is an integer between 1 and 100, and affects the quality of JPEG images as expected. For PNG images, the value is scaled between 0 and 9, and is used to determine the compression rate for the resulting image.
-
-### `fit`
-
-Determines whether an image should be cropped when resizing. For example, for an image size of **500x1000** and a pipeline of `width=400,height=400,fit=...`, `fit=clip` would result in an image size of **200x400**, whereas `fit=crop` would result in an image size of **400x400**, with extra pixels being removed according to the cropping strategy.
-
-### `crop`
-
-Determines the cropping strategy. Values `top`, `bottom`, `left` and `right` determine which part of the image is cut off. In the above example, the default cropping strategy of `top` would result in the top 200 pixels being removed. Strategy `focus` defines that the center of gravity for the crop is determined by a bounding box, as passed in the `focus` parameter.
-
-### `focus`
-
-This parameter defines the center of gravity for image crops as a bounding box. The bounding box is defined as four, colon-separated, integer values corresponding to the width, height, X and Y position of the bounding box relative to the original image's dimensions.
-
-### `frame`
-
-If `true`, and we're processing an animated GIF file, this will only process and return the first frame in the image.
+More information on the image processing pipeline can be found in the [README file](https://github.com/deuill/mash/blob/master/service/ico/pipeline/README.md) for the pipeline package.
 
 ## Image caching
 

@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	// Internal packages
+	"github.com/deuill/mash/service/ico/image"
+
 	// Third-party packages
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
@@ -54,12 +57,12 @@ func (s *Source) InitCache(base string, size int64) error {
 	return nil
 }
 
-// Get fetches file data from local cache or S3 bucket for this source.
-func (s *Source) Get(name string) ([]byte, error) {
+// Get fetches image data from local cache or S3 bucket for this source.
+func (s *Source) Get(name string) (*image.Image, error) {
 	// Check for locally cached data.
 	if s.cache != nil {
 		if data := s.cache.Get(name); data != nil {
-			return data.([]byte), nil
+			return image.New(data.([]byte))
 		}
 	}
 
@@ -74,7 +77,7 @@ func (s *Source) Get(name string) ([]byte, error) {
 		s.cache.Add(name, data)
 	}
 
-	return data, nil
+	return image.New(data)
 }
 
 // Put inserts data into local cache and remote S3 bucket for this source.

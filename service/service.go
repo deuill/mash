@@ -22,7 +22,7 @@ var (
 // Response represents a JSON response, containing a response code and serialise-able data.
 type Response struct {
 	Code int         // The HTTP response code.
-	Data interface{} // The data to serialise to JSON.
+	Data interface{} // The data to serialize to JSON.
 }
 
 // A HandleFunc represents the default signature for registered methods attached to services.

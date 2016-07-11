@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"strings"
 
 	// Internal packages
 	"github.com/deuill/mash/service"
+	"github.com/deuill/mash/service/ico/pipeline"
 )
 
 // The Ico service, containing state shared between methods.
@@ -40,48 +40,37 @@ func (m *Ico) Process(w http.ResponseWriter, r *http.Request, p service.Params) 
 	procPath := path.Join(dir, params, file)
 
 	// Fetch existing processed file, if any.
-	if data, _ := src.Get(procPath); data != nil {
-		writeResponse(data, int64(len(data)), GetFileType(data), w)
+	if img, _ := src.Get(procPath); img != nil {
+		writeResponse(img.Data, img.Size, img.Type.String(), w)
 		return nil, nil
 	}
 
 	// Prepare pipeline and set parameters from user request.
-	pipeline, err := NewPipeline()
+	pl, err := pipeline.New(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize pipeline: %s", err)
 	}
 
-	for _, p := range strings.Split(params, ",") {
-		t := strings.Split(p, "=")
-		if len(t) != 2 {
-			return nil, fmt.Errorf("request parameter for pipeline is malformed: '%s'", p)
-		}
-
-		key, value := strings.TrimSpace(t[0]), strings.TrimSpace(t[1])
-		if err = pipeline.SetOption(key, value); err != nil {
-			return nil, err
-		}
-	}
-
 	// Fetch original image from remote server or local cache.
-	origImg, err := src.Get(imgPath)
+	img, err := src.Get(imgPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch from source: %s", err)
 	}
 
 	// Process image through pipeline.
-	img, err := pipeline.Process(origImg)
-	if err != nil {
+	if err = pl.Process(img); err != nil {
 		return nil, fmt.Errorf("failed to process image: %s", err)
 	}
 
 	// If processing a GET request, store image locally and upload to S3 bucket asynchronously, then
 	// write image back to user. Otherwise, wait for upload process to complete and return nothing.
-	if r.Method == "GET" {
-		go src.Put(procPath, img.Data, img.Type)
-		writeResponse(img.Data, img.Size, img.Type, w)
-	} else {
-		src.Put(procPath, img.Data, img.Type)
+	switch r.Method {
+	case "GET":
+		go src.Put(procPath, img.Data, img.Type.String())
+		writeResponse(img.Data, img.Size, img.Type.String(), w)
+	default:
+		src.Put(procPath, img.Data, img.Type.String())
+		return &service.Response{http.StatusOK, map[string]bool{"result": true}}, nil
 	}
 
 	return nil, nil
