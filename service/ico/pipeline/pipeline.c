@@ -17,12 +17,17 @@ int ico_init() {
 	return 0;
 }
 
+const char *ico_error() {
+	return vips_error_buffer();
+}
+
 ico_image *ico_image_new(const void *data, size_t len, int type) {
 	ico_image *img;
 
 	// Allocate initial image structure.
 	img = malloc(sizeof(ico_image));
 	if (img == NULL) {
+		vips_error("pipeline", "%s", "failed to allocate memory for Ico image");
 		errno = 1;
 		return NULL;
 	}

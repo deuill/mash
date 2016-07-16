@@ -17,6 +17,7 @@ enum {
 };
 
 int ico_init();
+const char *ico_error();
 
 ico_image *ico_image_new(const void *data, size_t len, int type);
 void ico_image_write(ico_image *img, void **buf, size_t *len);
